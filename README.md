@@ -13,14 +13,20 @@ App do aluno do CCAM, feito em Flutter. Usa a mesma API do sistema web: https://
 
 ## Como rodar
 
-1. Suba o sistema web (porta 8081).
-2. Abra esta pasta no Android Studio e rode no emulador, ou:
+1. Suba o sistema web (na pasta do site: `./mvnw spring-boot:run`).
+2. Nesta pasta, rode:
 
 ```
-flutter run
+./testar-no-emulador.sh
 ```
 
-No emulador Android o app acessa a API em `http://10.0.2.2:8081/api`. Para usar outro endereço:
+O script gera o APK com o emulador desligado, liga o emulador com pouca memória e abre o app. Em PC com
+pouca RAM, não rode o build e o emulador ao mesmo tempo, e feche o IntelliJ e o Android Studio antes.
+
+Também dá para rodar pelo Android Studio ou com `flutter run`. O Flutter precisa usar o Java 21
+(`flutter config --jdk-dir=/usr/lib/jvm/java-21-openjdk-amd64`), porque o Gradle do projeto não aceita o Java 25.
+
+No emulador o app acessa a API em `http://10.0.2.2:8081/api`. Para usar outro endereço:
 
 ```
 flutter run --dart-define=API_URL=https://seu-servidor.com/api
