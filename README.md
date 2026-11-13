@@ -1,39 +1,29 @@
 # CCAM App
 
-App do aluno do CCAM, feito em Flutter. Usa a mesma API do sistema web: https://github.com/marinalivias/ccam
+App do aluno do CCAM, feito em Flutter. Depende do site: https://github.com/marinalivias/ccam
 
-## O que o aluno faz no app
-
-- Vê o treino do dia e marca cada exercício conforme vai fazendo
-- Vê a agenda da semana e marca treinos dos últimos 30 dias
-- Adiciona, edita e remove exercícios da própria ficha (o professor vê tudo no histórico do site)
-- Lê o mural de avisos da academia
-- Vê quem faz aniversário no mês
-- Acompanha a frequência e as mensalidades
+O aluno vê a ficha de treino, marca o que treinou, ajusta os exercícios, lê o mural, vê os aniversariantes
+e acompanha a frequência e as mensalidades.
 
 ## Como rodar
 
-1. Suba o sistema web (na pasta do site: `./mvnw spring-boot:run`).
-2. Nesta pasta, rode:
+1. Suba o site (porta 8081).
+2. Nesta pasta:
 
 ```
 ./testar-no-emulador.sh
 ```
 
-O script gera o APK com o emulador desligado, liga o emulador com pouca memória e abre o app. Em PC com
-pouca RAM, não rode o build e o emulador ao mesmo tempo, e feche o IntelliJ e o Android Studio antes.
-
-Também dá para rodar pelo Android Studio ou com `flutter run`. O Flutter precisa usar o Java 21
-(`flutter config --jdk-dir=/usr/lib/jvm/java-21-openjdk-amd64`), porque o Gradle do projeto não aceita o Java 25.
-
-No emulador o app acessa a API em `http://10.0.2.2:8081/api`. Para usar outro endereço:
+Ou rode pelo Android Studio. O Flutter precisa usar o Java 21:
 
 ```
-flutter run --dart-define=API_URL=https://seu-servidor.com/api
+flutter config --jdk-dir=/usr/lib/jvm/java-21-openjdk-amd64
 ```
 
 ## Login de exemplo
 
-| E-mail | CPF |
+| E-mail | Senha (CPF) |
 |---|---|
-| beatriz.martins@exemplo.com | 03186265940 |
+| aluno@ccam.com | 11144477735 |
+
+Qualquer aluno cadastrado no site entra com o e-mail e o CPF dele.
