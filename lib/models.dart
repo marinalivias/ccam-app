@@ -153,26 +153,96 @@ class Aviso {
 }
 
 class Aniversariante {
+  final String id;
   final String nome;
   final int dia;
   final int mes;
   final bool hoje;
   final bool voce;
+  final bool parabensEnviado;
 
   Aniversariante({
+    required this.id,
     required this.nome,
     required this.dia,
     required this.mes,
     required this.hoje,
     required this.voce,
+    required this.parabensEnviado,
   });
 
   factory Aniversariante.fromJson(Map<String, dynamic> j) => Aniversariante(
+        id: j['id'].toString(),
         nome: (j['nome'] ?? '').toString(),
         dia: (j['dia'] as num).toInt(),
         mes: (j['mes'] as num).toInt(),
         hoje: j['hoje'] == true,
         voce: j['voce'] == true,
+        parabensEnviado: j['parabensEnviado'] == true,
+      );
+}
+
+class Produto {
+  final String id;
+  final String nome;
+  final String? descricao;
+  final String? categoria;
+  final double preco;
+  final double precoFinal;
+  final bool descontoAniversario;
+
+  Produto({
+    required this.id,
+    required this.nome,
+    this.descricao,
+    this.categoria,
+    required this.preco,
+    required this.precoFinal,
+    required this.descontoAniversario,
+  });
+
+  bool get comDesconto => precoFinal < preco;
+
+  factory Produto.fromJson(Map<String, dynamic> j) => Produto(
+        id: j['id'].toString(),
+        nome: (j['nome'] ?? '').toString(),
+        descricao: j['descricao']?.toString(),
+        categoria: j['categoria']?.toString(),
+        preco: (j['preco'] as num).toDouble(),
+        precoFinal: (j['precoFinal'] as num).toDouble(),
+        descontoAniversario: j['descontoAniversario'] == true,
+      );
+}
+
+class Loja {
+  final bool ativa;
+  final int descontoAniversario;
+  final bool aniversarioHoje;
+  final List<Produto> produtos;
+
+  Loja({required this.ativa, required this.descontoAniversario, required this.aniversarioHoje, required this.produtos});
+
+  factory Loja.fromJson(Map<String, dynamic> j) => Loja(
+        ativa: j['ativa'] == true,
+        descontoAniversario: (j['descontoAniversario'] as num?)?.toInt() ?? 0,
+        aniversarioHoje: j['aniversarioHoje'] == true,
+        produtos: ((j['produtos'] as List?) ?? []).map((e) => Produto.fromJson(e)).toList(),
+      );
+}
+
+class Notificacao {
+  final String id;
+  final String remetente;
+  final DateTime? criadoEm;
+  final bool lido;
+
+  Notificacao({required this.id, required this.remetente, this.criadoEm, required this.lido});
+
+  factory Notificacao.fromJson(Map<String, dynamic> j) => Notificacao(
+        id: j['id'].toString(),
+        remetente: (j['remetente'] ?? '').toString(),
+        criadoEm: j['criadoEm'] != null ? DateTime.tryParse(j['criadoEm']) : null,
+        lido: j['lido'] == true,
       );
 }
 

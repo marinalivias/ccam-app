@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../social_store.dart';
 import '../theme.dart';
 import '../treino_store.dart';
 import '../utils/helpers.dart';
@@ -13,9 +14,16 @@ import '../widgets/exercicio_widgets.dart';
 class HojeScreen extends StatelessWidget {
   final Aluno aluno;
   final TreinoStore store;
+  final SocialStore social;
   final VoidCallback irParaSemana;
 
-  const HojeScreen({super.key, required this.aluno, required this.store, required this.irParaSemana});
+  const HojeScreen({super.key, required this.aluno, required this.store, required this.social, required this.irParaSemana});
+
+  bool get _aniversarioHoje {
+    final d = aluno.dataNascimento;
+    final hoje = DateTime.now();
+    return d != null && d.month == hoje.month && d.day == hoje.day;
+  }
 
   Future<void> _marcar(BuildContext context, DateTime hoje, String id) async {
     try {
@@ -69,7 +77,7 @@ class HojeScreen extends StatelessWidget {
 
         return SafeArea(
           child: RefreshIndicator(
-            onRefresh: store.carregar,
+            onRefresh: () => Future.wait([store.carregar(), social.carregar()]),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               children: [
@@ -88,9 +96,15 @@ class HojeScreen extends StatelessWidget {
                       ),
                     ),
                     if (aluno.academia != null) Flexible(child: Selo(aluno.academia!, tipo: TipoSelo.marca)),
+                    const SizedBox(width: 4),
+                    _Sino(social: social),
                   ],
                 ),
                 const SizedBox(height: 18),
+                if (_aniversarioHoje) ...[
+                  _Aniversario(nome: aluno.primeiroNome, social: social),
+                  const SizedBox(height: 12),
+                ],
                 _ResumoSemana(store: store, onTap: irParaSemana),
                 const SizedBox(height: 12),
                 const CronometroDescanso(),
@@ -161,6 +175,125 @@ class HojeScreen extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _Sino extends StatelessWidget {
+  final SocialStore social;
+
+  const _Sino({required this.social});
+
+  void _abrir(BuildContext context) {
+    social.carregarNotificacoes();
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => ListenableBuilder(
+        listenable: social,
+        builder: (ctx, _) => SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              children: [
+                const Text('Notificações', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 12),
+                if (social.notificacoes.isEmpty)
+                  const Vazio(icone: Icons.notifications_none_rounded, titulo: 'Nada por aqui', texto: 'Quando um colega te mandar parabéns, aparece aqui.')
+                else
+                  for (final n in social.notificacoes)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Cartao(
+                        padding: const EdgeInsets.all(12),
+                        corBorda: n.lido ? null : Cores.marcaClara,
+                        child: Row(
+                          children: [
+                            const IconeChip(Icons.celebration_rounded, cor: Cores.verde),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('${n.remetente} te mandou parabéns!', style: const TextStyle(fontWeight: FontWeight.w700)),
+                                  if (n.criadoEm != null)
+                                    Text(Helpers.dataPorExtenso(n.criadoEm!), style: const TextStyle(color: Cores.textoFraco, fontSize: 12.5)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).then((_) => social.marcarLidas());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: social,
+      builder: (context, _) => IconButton(
+        tooltip: 'Notificações',
+        onPressed: () => _abrir(context),
+        icon: Badge(
+          isLabelVisible: social.naoLidas > 0,
+          label: Text('${social.naoLidas}'),
+          backgroundColor: Cores.verde,
+          child: const Icon(Icons.notifications_none_rounded, color: Cores.textoSuave),
+        ),
+      ),
+    );
+  }
+}
+
+class _Aniversario extends StatelessWidget {
+  final String nome;
+  final SocialStore social;
+
+  const _Aniversario({required this.nome, required this.social});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: social,
+      builder: (context, _) {
+        final hoje = DateTime.now();
+        final recebidos = social.notificacoes.where((n) => n.criadoEm != null && Helpers.mesmoDia(n.criadoEm!, hoje)).length;
+        final loja = social.loja;
+        final linhas = [
+          if (recebidos > 0) '$recebidos ${recebidos == 1 ? 'colega te mandou' : 'colegas te mandaram'} parabéns.',
+          if (loja != null && loja.ativa && loja.descontoAniversario > 0) 'Hoje você tem ${loja.descontoAniversario}% de desconto na loja.',
+        ];
+        return Cartao(
+          corBorda: const Color(0x6122C55E),
+          child: Row(
+            children: [
+              const IconeChip(Icons.celebration_rounded, cor: Cores.verde),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Feliz aniversário, $nome!', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                    if (linhas.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(linhas.join(' '), style: const TextStyle(color: Cores.textoSuave, height: 1.4)),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         );
       },

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../social_store.dart';
 import '../theme.dart';
 import '../utils/helpers.dart';
 import '../widgets/comum.dart';
 
 class TurmaScreen extends StatefulWidget {
-  const TurmaScreen({super.key});
+  final SocialStore social;
+
+  const TurmaScreen({super.key, required this.social});
 
   @override
   State<TurmaScreen> createState() => _TurmaScreenState();
@@ -35,6 +38,16 @@ class _TurmaScreenState extends State<TurmaScreen> {
       if (mounted) setState(() => _lista = resp.map((e) => Aniversariante.fromJson(e)).toList());
     } on ApiException catch (e) {
       if (mounted) setState(() => _erro = e.mensagem);
+    }
+  }
+
+  Future<void> _parabens(Aniversariante a) async {
+    try {
+      final msg = await widget.social.mandarParabens(a.id);
+      if (mounted) mostrarMensagem(context, msg);
+      _carregar();
+    } on ApiException catch (e) {
+      if (mounted) mostrarMensagem(context, e.mensagem, erro: true);
     }
   }
 
@@ -111,7 +124,11 @@ class _TurmaScreenState extends State<TurmaScreen> {
                   children: [
                     for (var i = 0; i < lista.length; i++) ...[
                       if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
-                      _Linha(item: lista[i], passou: _mes.year == hoje.year && _mes.month == hoje.month && lista[i].dia < hoje.day),
+                      _Linha(
+                        item: lista[i],
+                        passou: _mes.year == hoje.year && _mes.month == hoje.month && lista[i].dia < hoje.day,
+                        onParabens: () => _parabens(lista[i]),
+                      ),
                     ],
                   ],
                 ),
@@ -126,8 +143,9 @@ class _TurmaScreenState extends State<TurmaScreen> {
 class _Linha extends StatelessWidget {
   final Aniversariante item;
   final bool passou;
+  final VoidCallback onParabens;
 
-  const _Linha({required this.item, required this.passou});
+  const _Linha({required this.item, required this.passou, required this.onParabens});
 
   @override
   Widget build(BuildContext context) {
@@ -158,7 +176,24 @@ class _Linha extends StatelessWidget {
                 ],
               ),
             ),
-            if (item.hoje) const Selo('Hoje', tipo: TipoSelo.ok) else if (item.voce) const Selo('Você', tipo: TipoSelo.marca),
+            if (item.hoje && !item.voce)
+              item.parabensEnviado
+                  ? const Selo('Parabéns enviado', tipo: TipoSelo.ok)
+                  : FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Cores.verde.withValues(alpha: 0.2),
+                        foregroundColor: Cores.verdeClaro,
+                        side: const BorderSide(color: Color(0x6122C55E)),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      onPressed: onParabens,
+                      icon: const Icon(Icons.celebration_rounded, size: 18),
+                      label: const Text('Parabéns'),
+                    )
+            else if (item.hoje)
+              const Selo('Hoje', tipo: TipoSelo.ok)
+            else if (item.voce)
+              const Selo('Você', tipo: TipoSelo.marca),
           ],
         ),
       ),

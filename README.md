@@ -2,8 +2,9 @@
 
 App do aluno do CCAM, feito em Flutter. Depende do site: https://github.com/marinalivias/ccam
 
-O aluno vê a ficha de treino, marca o que treinou, ajusta os exercícios, lê o mural, vê os aniversariantes
-e acompanha a frequência e as mensalidades.
+O aluno vê a ficha de treino, marca o que treinou, ajusta os exercícios, lê o mural, manda parabéns para
+os aniversariantes, vê a loja da academia (com desconto no dia do aniversário) e acompanha a frequência e as
+mensalidades.
 
 ## Como rodar
 
