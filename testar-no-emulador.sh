@@ -19,6 +19,10 @@ if "$ADB" devices | grep -q '^emulator'; then
     echo "O APK ainda nao foi gerado. Feche o emulador e rode este script de novo."
     exit 1
   fi
+  if [ -n "$(find lib pubspec.yaml -newer "$APK" -print -quit)" ]; then
+    echo "O codigo mudou desde o ultimo APK. Feche o emulador e rode este script de novo para atualizar."
+    exit 1
+  fi
 else
   echo "Gerando o APK com o emulador desligado..."
   flutter build apk --debug
