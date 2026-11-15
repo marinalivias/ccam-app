@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../notificacoes.dart';
 import '../social_store.dart';
 import '../treino_store.dart';
 import '../widgets/comum.dart';
+import 'calendario_screen.dart';
+import 'financeiro_screen.dart';
 import 'hoje_screen.dart';
 import 'loja_screen.dart';
 import 'mural_screen.dart';
 import 'perfil_screen.dart';
-import 'semana_screen.dart';
-import 'turma_screen.dart';
 
 class InicioShell extends StatefulWidget {
   final Aluno aluno;
@@ -20,7 +21,7 @@ class InicioShell extends StatefulWidget {
   State<InicioShell> createState() => _InicioShellState();
 }
 
-class _InicioShellState extends State<InicioShell> {
+class _InicioShellState extends State<InicioShell> with WidgetsBindingObserver {
   final _store = TreinoStore();
   final _social = SocialStore();
   int _aba = 0;
@@ -30,10 +31,18 @@ class _InicioShellState extends State<InicioShell> {
     super.initState();
     _store.carregar();
     _social.carregar();
+    Notificacoes.aoEntrar();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _social.carregarNotificacoes();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _store.dispose();
     _social.dispose();
     super.dispose();
@@ -47,20 +56,34 @@ class _InicioShellState extends State<InicioShell> {
         final temLoja = _social.loja?.ativa == true;
         final abas = <(Widget, NavigationDestination)>[
           (
-            HojeScreen(aluno: widget.aluno, store: _store, social: _social, irParaSemana: () => setState(() => _aba = 1)),
+            HojeScreen(
+              aluno: widget.aluno,
+              store: _store,
+              social: _social,
+              irParaSemana: () => setState(() => _aba = 1),
+              abrirNotificacao: (tipo) => setState(() {
+                _aba = switch (tipo) {
+                  'treino' => 1,
+                  'aviso' => 2,
+                  'pagamento' => 3,
+                  'aniversario' when temLoja => 4,
+                  _ => _aba,
+                };
+              }),
+            ),
             const NavigationDestination(icon: Icon(Icons.fitness_center_outlined), selectedIcon: Icon(Icons.fitness_center), label: 'Hoje'),
           ),
           (
-            SemanaScreen(store: _store),
-            const NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Semana'),
+            CalendarioScreen(store: _store),
+            const NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: 'Agenda'),
           ),
           (
             const MuralScreen(),
             const NavigationDestination(icon: Icon(Icons.campaign_outlined), selectedIcon: Icon(Icons.campaign), label: 'Mural'),
           ),
           (
-            TurmaScreen(social: _social),
-            const NavigationDestination(icon: Icon(Icons.cake_outlined), selectedIcon: Icon(Icons.cake), label: 'Turma'),
+            const FinanceiroScreen(),
+            const NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Financeiro'),
           ),
           if (temLoja)
             (

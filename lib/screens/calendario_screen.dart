@@ -8,37 +8,44 @@ import '../widgets/comum.dart';
 import '../widgets/exercicio_widgets.dart';
 import 'minha_ficha_screen.dart';
 
-class SemanaScreen extends StatefulWidget {
+class CalendarioScreen extends StatefulWidget {
   final TreinoStore store;
 
-  const SemanaScreen({super.key, required this.store});
+  const CalendarioScreen({super.key, required this.store});
 
   @override
-  State<SemanaScreen> createState() => _SemanaScreenState();
+  State<CalendarioScreen> createState() => _CalendarioScreenState();
 }
 
-class _SemanaScreenState extends State<SemanaScreen> {
-  late DateTime _segunda = Helpers.segundaDaSemana(DateTime.now());
+class _CalendarioScreenState extends State<CalendarioScreen> {
+  late DateTime _mes = DateTime(DateTime.now().year, DateTime.now().month);
   late DateTime _selecionado = Helpers.soData(DateTime.now());
-  bool _carregandoSemana = false;
+  bool _carregandoMes = false;
 
   TreinoStore get store => widget.store;
   DateTime get _hoje => Helpers.soData(DateTime.now());
 
-  Future<void> _mudarSemana(int delta) async {
-    final nova = _segunda.add(Duration(days: 7 * delta));
+  @override
+  void initState() {
+    super.initState();
+    _mudarMes(0);
+  }
+
+  Future<void> _mudarMes(int delta) async {
+    final novo = DateTime(_mes.year, _mes.month + delta);
+    final mesAtual = novo.year == _hoje.year && novo.month == _hoje.month;
     setState(() {
-      _segunda = nova;
-      _selecionado = Helpers.mesmoDia(Helpers.segundaDaSemana(_hoje), nova) ? _hoje : nova;
-      _carregandoSemana = true;
+      _mes = novo;
+      if (delta != 0) _selecionado = mesAtual ? _hoje : novo;
+      _carregandoMes = true;
     });
     try {
-      final fim = nova.add(const Duration(days: 6));
-      await store.carregarPeriodo(nova, fim.isAfter(_hoje) ? _hoje : fim);
+      final ultimo = DateTime(novo.year, novo.month + 1, 0);
+      if (!novo.isAfter(_hoje)) await store.carregarPeriodo(novo, ultimo.isAfter(_hoje) ? _hoje : ultimo);
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.mensagem, erro: true);
     } finally {
-      if (mounted) setState(() => _carregandoSemana = false);
+      if (mounted) setState(() => _carregandoMes = false);
     }
   }
 
@@ -49,26 +56,38 @@ class _SemanaScreenState extends State<SemanaScreen> {
     return ListenableBuilder(
       listenable: store,
       builder: (context, _) {
-        final fim = _segunda.add(const Duration(days: 6));
         final lista = store.doDia(_selecionado);
         final feitos = store.feitosEm(_selecionado);
         final realizado = store.realizadoEm(_selecionado);
         final futuro = _selecionado.isAfter(_hoje);
-        final mesmoMes = _segunda.month == fim.month;
-        final titulo = mesmoMes
-            ? '${_segunda.day} a ${fim.day} de ${Helpers.meses[fim.month - 1]}'
-            : '${Helpers.dataPorExtenso(_segunda)} a ${Helpers.dataPorExtenso(fim)}';
+        final diasNoMes = DateTime(_mes.year, _mes.month + 1, 0).day;
+        final vazios = DateTime(_mes.year, _mes.month, 1).weekday - 1;
+        final celulas = ((vazios + diasNoMes) / 7).ceil() * 7;
+        var treinosMes = 0;
+        var completosMes = 0;
+        var previstosMes = 0;
+        for (var d = 1; d <= diasNoMes; d++) {
+          final data = DateTime(_mes.year, _mes.month, d);
+          final r = store.realizadoEm(data);
+          if (r != null) {
+            treinosMes++;
+            if (r.concluido) completosMes++;
+          }
+          if (!data.isAfter(_hoje) && store.doDia(data).isNotEmpty) previstosMes++;
+        }
+        final nomeMes = Helpers.meses[_mes.month - 1];
+        final titulo = '${nomeMes[0].toUpperCase()}${nomeMes.substring(1)} de ${_mes.year}';
 
         return SafeArea(
           child: RefreshIndicator(
-            onRefresh: () => _mudarSemana(0),
+            onRefresh: () => _mudarMes(0),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               children: [
                 Row(
                   children: [
                     const Expanded(
-                      child: Text('Agenda da semana', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
+                      child: Text('Calendário', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
                     ),
                     FilledButton.tonalIcon(
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MinhaFichaScreen(store: store))),
@@ -87,20 +106,40 @@ class _SemanaScreenState extends State<SemanaScreen> {
                     children: [
                       Row(
                         children: [
-                          IconButton(tooltip: 'Semana anterior', onPressed: () => _mudarSemana(-1), icon: const Icon(Icons.chevron_left_rounded)),
+                          IconButton(tooltip: 'Mês anterior', onPressed: () => _mudarMes(-1), icon: const Icon(Icons.chevron_left_rounded)),
                           Expanded(
-                            child: Text(titulo, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
+                            child: Text(titulo, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15.5)),
                           ),
-                          IconButton(tooltip: 'Próxima semana', onPressed: () => _mudarSemana(1), icon: const Icon(Icons.chevron_right_rounded)),
+                          IconButton(tooltip: 'Próximo mês', onPressed: () => _mudarMes(1), icon: const Icon(Icons.chevron_right_rounded)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          for (final d in Helpers.diasCurtos)
+                            Expanded(
+                              child: Text(d, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, color: Cores.textoFraco, fontWeight: FontWeight.w600)),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Row(
-                        children: List.generate(7, (i) {
-                          final d = _segunda.add(Duration(days: i));
-                          return Expanded(child: _Dia(data: d, store: store, selecionado: Helpers.mesmoDia(d, _selecionado), hoje: Helpers.mesmoDia(d, _hoje), onTap: () => setState(() => _selecionado = d)));
-                        }),
-                      ),
+                      for (var linha = 0; linha < celulas ~/ 7; linha++)
+                        Row(
+                          children: List.generate(7, (col) {
+                            final n = linha * 7 + col - vazios + 1;
+                            if (n < 1 || n > diasNoMes) return const Expanded(child: SizedBox(height: 46));
+                            final d = DateTime(_mes.year, _mes.month, n);
+                            return Expanded(
+                              child: _Dia(
+                                data: d,
+                                store: store,
+                                selecionado: Helpers.mesmoDia(d, _selecionado),
+                                hoje: Helpers.mesmoDia(d, _hoje),
+                                onTap: () => setState(() => _selecionado = d),
+                              ),
+                            );
+                          }),
+                        ),
                       const SizedBox(height: 12),
                       const Wrap(
                         spacing: 14,
@@ -115,8 +154,16 @@ class _SemanaScreenState extends State<SemanaScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _Resumo(valor: '$treinosMes', rotulo: treinosMes == 1 ? 'Treino no mês' : 'Treinos no mês'),
+                    _Resumo(valor: '$completosMes', rotulo: completosMes == 1 ? 'Completo' : 'Completos'),
+                    _Resumo(valor: previstosMes == 0 ? '--' : '${(treinosMes * 100 / previstosMes).round().clamp(0, 100)}%', rotulo: 'Dos previstos'),
+                  ],
+                ),
                 TituloSecao('${Helpers.obterDiaAtual(_selecionado.weekday)}, ${Helpers.dataPorExtenso(_selecionado)}'),
-                if (_carregandoSemana)
+                if (_carregandoMes)
                   const Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator()))
                 else if (lista.isEmpty)
                   const Cartao(
@@ -189,28 +236,55 @@ class _Dia extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        height: 46,
+        margin: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           color: selecionado ? Cores.marca.withValues(alpha: 0.3) : Colors.transparent,
           border: Border.all(color: selecionado ? const Color(0x99A78BFA) : (hoje ? Cores.bordaForte : Colors.transparent)),
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(Helpers.diasCurtos[data.weekday - 1],
-                style: TextStyle(fontSize: 11.5, color: selecionado ? Cores.texto : Cores.textoFraco, fontWeight: FontWeight.w600)),
+            Text('${data.day}', style: TextStyle(fontSize: 15, fontWeight: hoje || selecionado ? FontWeight.w800 : FontWeight.w500)),
             const SizedBox(height: 4),
-            Text('${data.day}', style: TextStyle(fontSize: 17, fontWeight: hoje || selecionado ? FontWeight.w800 : FontWeight.w600)),
-            const SizedBox(height: 6),
             Container(
-              width: 8,
-              height: 8,
+              width: 6,
+              height: 6,
               decoration: BoxDecoration(shape: BoxShape.circle, color: marca ?? Colors.transparent),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Resumo extends StatelessWidget {
+  final String valor;
+  final String rotulo;
+
+  const _Resumo({required this.valor, required this.rotulo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        decoration: BoxDecoration(
+          color: Cores.superficie,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Cores.borda),
+        ),
+        child: Column(
+          children: [
+            Text(valor, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+            const SizedBox(height: 2),
+            Text(rotulo, textAlign: TextAlign.center, style: const TextStyle(color: Cores.textoFraco, fontSize: 11.5)),
           ],
         ),
       ),

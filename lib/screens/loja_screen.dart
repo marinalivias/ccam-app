@@ -6,10 +6,38 @@ import '../theme.dart';
 import '../utils/helpers.dart';
 import '../widgets/comum.dart';
 
-class LojaScreen extends StatelessWidget {
+class LojaScreen extends StatefulWidget {
   final SocialStore social;
 
   const LojaScreen({super.key, required this.social});
+
+  @override
+  State<LojaScreen> createState() => _LojaScreenState();
+}
+
+class _LojaScreenState extends State<LojaScreen> {
+  final _busca = TextEditingController();
+  String _termo = '';
+  String? _categoria;
+
+  SocialStore get social => widget.social;
+
+  @override
+  void dispose() {
+    _busca.dispose();
+    super.dispose();
+  }
+
+  static String _normalizar(String t) {
+    const de = 'áàâãäéèêëíìîïóòôõöúùûüç';
+    const para = 'aaaaaeeeeiiiiooooouuuuc';
+    final b = StringBuffer();
+    for (final c in t.toLowerCase().split('')) {
+      final i = de.indexOf(c);
+      b.write(i >= 0 ? para[i] : c);
+    }
+    return b.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,8 +45,17 @@ class LojaScreen extends StatelessWidget {
       listenable: social,
       builder: (context, _) {
         final loja = social.loja;
+        final todos = loja?.produtos ?? <Produto>[];
+        final categorias = {for (final p in todos) p.categoria ?? 'Outros'}.toList()..sort();
+        if (_categoria != null && !categorias.contains(_categoria)) _categoria = null;
+        final termo = _normalizar(_termo);
+        final filtrados = todos.where((p) {
+          if (_categoria != null && (p.categoria ?? 'Outros') != _categoria) return false;
+          if (termo.isEmpty) return true;
+          return _normalizar('${p.nome} ${p.descricao ?? ''} ${p.categoria ?? ''}').contains(termo);
+        }).toList();
         final grupos = <String, List<Produto>>{};
-        for (final p in loja?.produtos ?? <Produto>[]) {
+        for (final p in filtrados) {
           grupos.putIfAbsent(p.categoria ?? 'Outros', () => []).add(p);
         }
 
@@ -74,11 +111,58 @@ class LojaScreen extends StatelessWidget {
                     ),
                   if (loja.produtos.isEmpty)
                     const Cartao(child: Vazio(icone: Icons.shopping_bag_outlined, titulo: 'Nenhum produto por enquanto'))
-                  else
+                  else ...[
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _busca,
+                      onChanged: (v) => setState(() => _termo = v.trim()),
+                      textInputAction: TextInputAction.search,
+                      decoration: InputDecoration(
+                        hintText: 'Pesquisar produto',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: _termo.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: 'Limpar',
+                                icon: const Icon(Icons.close_rounded),
+                                onPressed: () => setState(() {
+                                  _busca.clear();
+                                  _termo = '';
+                                }),
+                              ),
+                      ),
+                    ),
+                    if (categorias.length > 1) ...[
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 40,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: [
+                            for (final c in [null, ...categorias])
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChoiceChip(
+                                  label: Text(c ?? 'Todas'),
+                                  selected: _categoria == c,
+                                  onSelected: (_) => setState(() => _categoria = c),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (filtrados.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 14),
+                        child: Cartao(child: Vazio(icone: Icons.search_off_rounded, titulo: 'Nenhum produto encontrado', texto: 'Tente outro nome ou categoria.')),
+                      )
+                    else
                     for (final g in grupos.entries) ...[
                       TituloSecao(g.key),
                       for (final p in g.value) _CartaoProduto(produto: p, desconto: loja.descontoAniversario),
                     ],
+                  ],
                 ],
               ],
             ),

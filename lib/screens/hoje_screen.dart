@@ -1,15 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../notificacoes.dart';
 import '../social_store.dart';
 import '../theme.dart';
 import '../treino_store.dart';
 import '../utils/helpers.dart';
 import '../widgets/comum.dart';
 import '../widgets/exercicio_widgets.dart';
+import '../widgets/notificacoes_sheet.dart';
 import 'minha_ficha_screen.dart';
 
 class HojeScreen extends StatelessWidget {
@@ -17,8 +20,16 @@ class HojeScreen extends StatelessWidget {
   final TreinoStore store;
   final SocialStore social;
   final VoidCallback irParaSemana;
+  final void Function(String tipo) abrirNotificacao;
 
-  const HojeScreen({super.key, required this.aluno, required this.store, required this.social, required this.irParaSemana});
+  const HojeScreen({
+    super.key,
+    required this.aluno,
+    required this.store,
+    required this.social,
+    required this.irParaSemana,
+    required this.abrirNotificacao,
+  });
 
   bool get _aniversarioHoje {
     final d = aluno.dataNascimento;
@@ -86,7 +97,7 @@ class HojeScreen extends StatelessWidget {
                     ),
                     if (aluno.academia != null) Flexible(child: Selo(aluno.academia!, tipo: TipoSelo.marca)),
                     const SizedBox(width: 4),
-                    _Sino(social: social),
+                    BotaoNotificacoes(social: social, abrir: abrirNotificacao),
                   ],
                 ),
                 const SizedBox(height: 18),
@@ -120,7 +131,7 @@ class HojeScreen extends StatelessWidget {
                       acao: OutlinedButton.icon(
                         onPressed: irParaSemana,
                         icon: const Icon(Icons.calendar_month_rounded, size: 18),
-                        label: const Text('Ver a semana'),
+                        label: const Text('Ver o calendário'),
                       ),
                     ),
                   )
@@ -157,81 +168,6 @@ class HojeScreen extends StatelessWidget {
   }
 }
 
-class _Sino extends StatelessWidget {
-  final SocialStore social;
-
-  const _Sino({required this.social});
-
-  void _abrir(BuildContext context) {
-    social.carregarNotificacoes();
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => ListenableBuilder(
-        listenable: social,
-        builder: (ctx, _) => SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
-            child: ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              children: [
-                const Text('Notificações', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 12),
-                if (social.notificacoes.isEmpty)
-                  const Vazio(icone: Icons.notifications_none_rounded, titulo: 'Nada por aqui', texto: 'Quando um colega te mandar parabéns, aparece aqui.')
-                else
-                  for (final n in social.notificacoes)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Cartao(
-                        padding: const EdgeInsets.all(12),
-                        corBorda: n.lido ? null : Cores.marcaClara,
-                        child: Row(
-                          children: [
-                            const IconeChip(Icons.celebration_rounded, cor: Cores.verde),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('${n.remetente} te mandou parabéns!', style: const TextStyle(fontWeight: FontWeight.w700)),
-                                  if (n.criadoEm != null)
-                                    Text(Helpers.dataPorExtenso(n.criadoEm!), style: const TextStyle(color: Cores.textoFraco, fontSize: 12.5)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ).then((_) => social.marcarLidas());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: social,
-      builder: (context, _) => IconButton(
-        tooltip: 'Notificações',
-        onPressed: () => _abrir(context),
-        icon: Badge(
-          isLabelVisible: social.naoLidas > 0,
-          label: Text('${social.naoLidas}'),
-          backgroundColor: Cores.verde,
-          child: const Icon(Icons.notifications_none_rounded, color: Cores.textoSuave),
-        ),
-      ),
-    );
-  }
-}
-
 class _Aniversario extends StatelessWidget {
   final String nome;
   final SocialStore social;
@@ -243,11 +179,9 @@ class _Aniversario extends StatelessWidget {
     return ListenableBuilder(
       listenable: social,
       builder: (context, _) {
-        final hoje = DateTime.now();
-        final recebidos = social.notificacoes.where((n) => n.criadoEm != null && Helpers.mesmoDia(n.criadoEm!, hoje)).length;
         final loja = social.loja;
         final linhas = [
-          if (recebidos > 0) '$recebidos ${recebidos == 1 ? 'colega te mandou' : 'colegas te mandaram'} parabéns.',
+          'A equipe da academia deseja um ótimo dia para você.',
           if (loja != null && loja.ativa && loja.descontoAniversario > 0) 'Hoje você tem ${loja.descontoAniversario}% de desconto na loja.',
         ];
         return Cartao(
@@ -372,17 +306,45 @@ class _CronometroDescansoState extends State<CronometroDescanso> {
       _restante = segundos;
       _total = segundos;
     });
+    Notificacoes.iniciarDescanso(segundos);
+    final fim = DateTime.now().add(Duration(seconds: segundos));
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
-      setState(() {
-        if (_restante > 0) _restante--;
-        if (_restante == 0) t.cancel();
-      });
+      final falta = fim.difference(DateTime.now()).inMilliseconds;
+      setState(() => _restante = falta <= 0 ? 0 : (falta / 1000).ceil());
+      if (_restante == 0) {
+        t.cancel();
+        final naTela = WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+        Notificacoes.descansoTerminou(emPrimeiroPlano: naTela);
+        if (naTela) _avisarFim();
+      }
     });
+  }
+
+  Future<void> _avisarFim() async {
+    SystemSound.play(SystemSoundType.alert);
+    HapticFeedback.heavyImpact();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.timer_off_rounded, color: Cores.verde, size: 40),
+        title: const Text('Descanso terminou', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w800)),
+        content: const Text('Hora da próxima série!', textAlign: TextAlign.center, style: TextStyle(color: Cores.textoSuave)),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(ctx),
+            icon: const Icon(Icons.fitness_center_rounded, size: 18),
+            label: const Text('Bora treinar'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _parar() {
     _timer?.cancel();
+    Notificacoes.pararDescanso();
     setState(() => _restante = 0);
   }
 

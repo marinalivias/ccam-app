@@ -1,18 +1,24 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'models.dart';
+import 'notificacoes.dart';
 
 class SocialStore extends ChangeNotifier {
+  static const _chaveVisto = 'notificacoes_vistas_em';
+
   final _api = Api.instancia;
 
   Loja? loja;
   List<Notificacao> notificacoes = [];
-  int naoLidas = 0;
+  DateTime? _vistasEm;
 
-  Future<void> carregar() async {
-    await Future.wait([carregarLoja(), carregarNotificacoes()]);
-  }
+  int get naoLidas => notificacoes.where((n) => _vistasEm == null || n.data.isAfter(_vistasEm!)).length;
+
+  bool novidade(Notificacao n) => _vistasEm == null || n.data.isAfter(_vistasEm!);
+
+  Future<void> carregar() => Future.wait([carregarLoja(), carregarNotificacoes()]);
 
   Future<void> carregarLoja() async {
     try {
@@ -25,9 +31,11 @@ class SocialStore extends ChangeNotifier {
 
   Future<void> carregarNotificacoes() async {
     try {
-      final resp = await _api.get('/notificacoes');
-      notificacoes = ((resp['itens'] as List?) ?? []).map((e) => Notificacao.fromJson(e)).toList();
-      naoLidas = (resp['naoLidas'] as num?)?.toInt() ?? 0;
+      final lista = await _api.get('/notificacoes') as List;
+      notificacoes = lista.map((e) => Notificacao.fromJson(e)).toList();
+      final prefs = await SharedPreferences.getInstance();
+      _vistasEm = DateTime.tryParse(prefs.getString(_chaveVisto) ?? '');
+      await Notificacoes.marcarAvisadas(notificacoes);
       notifyListeners();
     } on ApiException {
       return;
@@ -35,18 +43,9 @@ class SocialStore extends ChangeNotifier {
   }
 
   Future<void> marcarLidas() async {
-    if (naoLidas == 0) return;
-    naoLidas = 0;
+    _vistasEm = DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_chaveVisto, _vistasEm!.toIso8601String());
     notifyListeners();
-    try {
-      await _api.post('/notificacoes/lidas');
-    } on ApiException {
-      return;
-    }
-  }
-
-  Future<String> mandarParabens(String alunoId) async {
-    final resp = await _api.post('/parabens/$alunoId');
-    return (resp is Map && resp['mensagem'] != null) ? resp['mensagem'].toString() : 'Parabéns enviado!';
   }
 }

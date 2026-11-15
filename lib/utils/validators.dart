@@ -10,13 +10,9 @@ class Validators {
     return null;
   }
 
-  static String? validaCpf(String? value) {
-    final numeros = (value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-    if (numeros.isEmpty) {
-      return 'Informe seu CPF';
-    }
-    if (numeros.length != 11) {
-      return 'O CPF tem 11 números';
+  static String? validaSenha(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Informe sua senha';
     }
     return null;
   }

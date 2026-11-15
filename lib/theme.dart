@@ -94,7 +94,8 @@ ThemeData temaCcam() {
       height: 68,
       labelTextStyle: WidgetStateProperty.resolveWith(
         (s) => GoogleFonts.inter(
-          fontSize: 12,
+          fontSize: 11,
+          letterSpacing: -0.2,
           fontWeight: s.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
           color: s.contains(WidgetState.selected) ? Cores.texto : Cores.textoFraco,
         ),

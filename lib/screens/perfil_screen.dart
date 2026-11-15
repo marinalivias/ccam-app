@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../notificacoes.dart';
 import '../theme.dart';
 import '../treino_store.dart';
 import '../utils/helpers.dart';
+import '../widgets/graficos.dart';
 import '../widgets/comum.dart';
 import 'login_screen.dart';
 
@@ -21,34 +23,80 @@ class PerfilScreen extends StatefulWidget {
 }
 
 class _PerfilScreenState extends State<PerfilScreen> {
-  List<Mensalidade>? _mensalidades;
-  String? _erroFin;
-
   @override
   void initState() {
     super.initState();
-    _carregarFinanceiro();
+    _carregarHistorico();
   }
 
-  Future<void> _carregarFinanceiro() async {
-    setState(() => _erroFin = null);
+  Future<void> _carregarHistorico() async {
+    final hoje = Helpers.soData(DateTime.now());
     try {
-      final lista = await Api.instancia.get('/financeiro') as List;
-      if (mounted) setState(() => _mensalidades = lista.map((e) => Mensalidade.fromJson(e)).toList());
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _erroFin = e.mensagem);
+      await widget.store.carregarPeriodo(Helpers.segundaDaSemana(hoje).subtract(const Duration(days: 49)), hoje);
+    } on ApiException {
+      return;
     }
   }
 
   Future<void> _sair() async {
-    final ok = await confirmar(context, titulo: 'Sair da conta?', mensagem: 'Você vai precisar do e-mail e do CPF para entrar de novo.', botao: 'Sair');
+    final ok = await confirmar(context, titulo: 'Sair da conta?', mensagem: 'Você vai precisar do e-mail e da senha para entrar de novo.', botao: 'Sair');
     if (!ok) return;
     try {
       await Api.instancia.post('/logout');
     } catch (_) {}
+    await Notificacoes.aoSair();
     await Api.instancia.limparToken();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
+  }
+
+  Future<void> _trocarSenha() async {
+    final atual = TextEditingController();
+    final nova = TextEditingController();
+    final chave = GlobalKey<FormState>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Alterar senha', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+        content: Form(
+          key: chave,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: atual,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Senha atual', helperText: 'Se nunca trocou, é o seu CPF'),
+                validator: (v) => (v ?? '').isEmpty ? 'Informe a senha atual' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: nova,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Nova senha'),
+                validator: (v) => (v ?? '').length < 6 ? 'Use pelo menos 6 caracteres' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () {
+              if (chave.currentState!.validate()) Navigator.pop(ctx, true);
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await Api.instancia.put('/senha', {'atual': atual.text, 'nova': nova.text});
+      if (mounted) mostrarMensagem(context, 'Senha alterada.');
+    } on ApiException catch (e) {
+      if (mounted) mostrarMensagem(context, e.mensagem, erro: true);
+    }
   }
 
   @override
@@ -57,7 +105,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () async {
-          await Future.wait([widget.store.carregarFrequencia(), _carregarFinanceiro()]);
+          await widget.store.carregarFrequencia();
+          await _carregarHistorico();
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -94,28 +143,16 @@ class _PerfilScreenState extends State<PerfilScreen> {
             ),
             const TituloSecao('Frequência na academia'),
             ListenableBuilder(listenable: widget.store, builder: (_, _) => _Frequencia(f: widget.store.frequencia)),
-            const TituloSecao('Mensalidades'),
-            if (_erroFin != null)
-              Erro(mensagem: _erroFin!, onTentar: _carregarFinanceiro)
-            else if (_mensalidades == null)
-              const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
-            else if (_mensalidades!.isEmpty)
-              const Cartao(child: Vazio(icone: Icons.account_balance_wallet_outlined, titulo: 'Nenhuma mensalidade lançada'))
-            else
-              Cartao(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < _mensalidades!.length; i++) ...[
-                      if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
-                      _LinhaMensalidade(m: _mensalidades![i]),
-                    ],
-                  ],
-                ),
-              ),
-            const SizedBox(height: 8),
-            const Text('Dúvidas sobre pagamentos? Fale com a recepção.', style: TextStyle(color: Cores.textoFraco, fontSize: 12.5)),
+            const TituloSecao('Sua evolução'),
+            ListenableBuilder(listenable: widget.store, builder: (_, _) => _Evolucao(store: widget.store)),
             const SizedBox(height: 24),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+              onPressed: _trocarSenha,
+              icon: const Icon(Icons.key_rounded, size: 20),
+              label: const Text('Alterar senha'),
+            ),
+            const SizedBox(height: 10),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 foregroundColor: Cores.vermelhoClaro,
@@ -204,6 +241,172 @@ class _Frequencia extends StatelessWidget {
   }
 }
 
+class _Evolucao extends StatefulWidget {
+  final TreinoStore store;
+
+  const _Evolucao({required this.store});
+
+  @override
+  State<_Evolucao> createState() => _EvolucaoState();
+}
+
+class _EvolucaoState extends State<_Evolucao> {
+  String? _exercicio;
+
+  static double? _numero(String? carga) {
+    if (carga == null) return null;
+    final m = RegExp(r'\d+([.,]\d+)?').firstMatch(carga);
+    return m == null ? null : double.tryParse(m.group(0)!.replaceAll(',', '.'));
+  }
+
+  static String _dia(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    final store = widget.store;
+    final hoje = Helpers.soData(DateTime.now());
+    final segunda = Helpers.segundaDaSemana(hoje);
+    final inicio30 = hoje.subtract(const Duration(days: 29));
+    final ultimos30 = store.realizadosEntre(inicio30, hoje).where((t) => t.feitos > 0 || t.seriesFeitas > 0).toList();
+
+    var series = 0;
+    var repeticoes = 0;
+    final porGrupo = <String, int>{};
+    for (final t in ultimos30) {
+      series += t.seriesFeitas;
+      for (final r in t.registros.values) {
+        final ex = store.exercicioPorId(r.exercicioId);
+        final meta = ex?.alvoReps ?? 1;
+        repeticoes += r.reps.fold(0, (a, b) => a + b);
+        final feitas = r.reps.where((v) => v >= meta).length;
+        if (feitas > 0) porGrupo.update(ex?.grupoMuscular ?? 'Outros', (v) => v + feitas, ifAbsent: () => feitas);
+      }
+    }
+    final grupos = porGrupo.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+
+    final semanas = <double>[];
+    final rotulos = <String>[];
+    for (var w = 7; w >= 0; w--) {
+      final ini = segunda.subtract(Duration(days: 7 * w));
+      final fim = ini.add(const Duration(days: 6));
+      semanas.add(store.realizadosEntre(ini, fim).where((t) => t.feitos > 0 || t.seriesFeitas > 0).length.toDouble());
+      rotulos.add(w == 0 ? 'Atual' : _dia(ini));
+    }
+
+    final cargas = <String, List<(DateTime, double)>>{};
+    for (final t in store.realizadosEntre(segunda.subtract(const Duration(days: 49)), hoje)) {
+      for (final r in t.registros.values) {
+        final v = _numero(r.carga);
+        final ex = store.exercicioPorId(r.exercicioId);
+        if (v == null || ex == null) continue;
+        cargas.putIfAbsent(ex.id, () => []).add((t.data, v));
+      }
+    }
+    cargas.removeWhere((_, l) => l.length < 2);
+    final opcoes = cargas.keys.toList()..sort((a, b) => (store.exercicioPorId(a)?.nome ?? '').compareTo(store.exercicioPorId(b)?.nome ?? ''));
+    final escolhido = opcoes.contains(_exercicio) ? _exercicio : (opcoes.isEmpty ? null : opcoes.first);
+    final pontos = escolhido == null ? <(DateTime, double)>[] : cargas[escolhido]!;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            _Numero(valor: '${ultimos30.length}', rotulo: 'Treinos em 30 dias'),
+            _Numero(valor: '$series', rotulo: 'Séries feitas'),
+            _Numero(valor: repeticoes >= 1000 ? '${(repeticoes / 1000).toStringAsFixed(1).replaceAll('.', ',')} mil' : '$repeticoes', rotulo: 'Repetições'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Cartao(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Treinos por semana', style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text(
+                store.frequencia != null && store.frequencia!.diasPorSemana > 0
+                    ? 'Últimas 8 semanas. A linha verde é a sua meta de ${store.frequencia!.diasPorSemana} por semana.'
+                    : 'Últimas 8 semanas.',
+                style: const TextStyle(color: Cores.textoFraco, fontSize: 12.5),
+              ),
+              const SizedBox(height: 14),
+              GraficoBarras(valores: semanas, rotulos: rotulos, meta: store.frequencia?.diasPorSemana.toDouble()),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Cartao(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Músculos mais treinados', style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              const Text('Séries completas nos últimos 30 dias.', style: TextStyle(color: Cores.textoFraco, fontSize: 12.5)),
+              const SizedBox(height: 10),
+              if (grupos.isEmpty)
+                const Text('Registre seus treinos para ver este gráfico.', style: TextStyle(color: Cores.textoSuave, fontSize: 13))
+              else
+                for (final g in grupos.take(6))
+                  BarraHorizontal(rotulo: g.key, valor: g.value.toDouble(), maximo: grupos.first.value.toDouble(), texto: '${g.value} séries'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Cartao(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Evolução da carga', style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              const Text('A carga usada em cada treino registrado.', style: TextStyle(color: Cores.textoFraco, fontSize: 12.5)),
+              const SizedBox(height: 10),
+              if (pontos.isEmpty)
+                const Text('Informe a carga ao registrar os exercícios para acompanhar sua evolução.',
+                    style: TextStyle(color: Cores.textoSuave, fontSize: 13, height: 1.4))
+              else ...[
+                SizedBox(
+                  height: 38,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (final id in opcoes)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(store.exercicioPorId(id)?.nome ?? ''),
+                            selected: id == escolhido,
+                            onSelected: (_) => setState(() => _exercicio = id),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                GraficoLinha(valores: [for (final p in pontos) p.$2], rotulos: [for (final p in pontos) _dia(p.$1)], unidade: ' kg'),
+                const SizedBox(height: 10),
+                Builder(builder: (_) {
+                  final primeiro = pontos.first.$2;
+                  final ultimo = pontos.last.$2;
+                  final dif = ultimo - primeiro;
+                  String fmt(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1).replaceAll('.', ',');
+                  final pct = primeiro > 0 ? (dif * 100 / primeiro).round() : 0;
+                  final texto = dif > 0
+                      ? 'Você saiu de ${fmt(primeiro)} kg para ${fmt(ultimo)} kg (+$pct%). Mandou bem!'
+                      : dif < 0
+                          ? 'Carga caiu de ${fmt(primeiro)} kg para ${fmt(ultimo)} kg.'
+                          : 'Carga mantida em ${fmt(ultimo)} kg.';
+                  return Text(texto, style: TextStyle(color: dif > 0 ? Cores.verdeClaro : Cores.textoSuave, fontSize: 13, fontWeight: FontWeight.w600));
+                }),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _Numero extends StatelessWidget {
   final String valor;
   final String rotulo;
@@ -260,36 +463,4 @@ class _Anel extends CustomPainter {
 
   @override
   bool shouldRepaint(_Anel old) => old.valor != valor || old.cor != cor;
-}
-
-class _LinhaMensalidade extends StatelessWidget {
-  final Mensalidade m;
-
-  const _LinhaMensalidade({required this.m});
-
-  @override
-  Widget build(BuildContext context) {
-    final hoje = Helpers.soData(DateTime.now());
-    final atrasada = !m.paga && m.vencimento.isBefore(hoje);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(Helpers.moeda(m.valor), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                Text('Vence em ${Helpers.dataCurta(m.vencimento)}', style: const TextStyle(color: Cores.textoSuave, fontSize: 13)),
-              ],
-            ),
-          ),
-          Selo(
-            m.paga ? 'Pago' : (atrasada ? 'Atrasada' : 'Pendente'),
-            tipo: m.paga ? TipoSelo.ok : (atrasada ? TipoSelo.perigo : TipoSelo.aviso),
-          ),
-        ],
-      ),
-    );
-  }
 }

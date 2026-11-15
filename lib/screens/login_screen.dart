@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
@@ -20,9 +19,9 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _form = GlobalKey<FormState>();
   final _email = TextEditingController();
-  final _cpf = TextEditingController();
+  final _senha = TextEditingController();
   bool _carregando = false;
-  bool _mostrarCpf = false;
+  bool _mostrarSenha = false;
   String? _erro;
 
   @override
@@ -34,7 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _email.dispose();
-    _cpf.dispose();
+    _senha.dispose();
     super.dispose();
   }
 
@@ -47,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final resp = await Api.instancia.post('/login', {
         'email': _email.text.trim().toLowerCase(),
-        'senha': _cpf.text.replaceAll(RegExp(r'[^0-9]'), ''),
+        'senha': _senha.text,
       });
       await Api.instancia.salvarToken(resp['token']);
       final aluno = Aluno.fromJson(resp['aluno']);
@@ -111,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             const Text('Acesse sua conta', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
                             const SizedBox(height: 4),
-                            const Text('Use o e-mail cadastrado na academia e o seu CPF.',
+                            const Text('Use o e-mail cadastrado na academia. No primeiro acesso, a senha é o seu CPF.',
                                 style: TextStyle(color: Cores.textoSuave, fontSize: 13.5)),
                             const SizedBox(height: 20),
                             TextFormField(
@@ -127,21 +126,20 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 14),
                             TextFormField(
-                              controller: _cpf,
-                              keyboardType: TextInputType.number,
-                              obscureText: !_mostrarCpf,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(11)],
+                              controller: _senha,
+                              obscureText: !_mostrarSenha,
+                              autofillHints: const [AutofillHints.password],
                               onFieldSubmitted: (_) => _entrar(),
                               decoration: InputDecoration(
-                                labelText: 'CPF (só números)',
+                                labelText: 'Senha',
                                 prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
                                 suffixIcon: IconButton(
-                                  tooltip: _mostrarCpf ? 'Ocultar' : 'Mostrar',
-                                  icon: Icon(_mostrarCpf ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
-                                  onPressed: () => setState(() => _mostrarCpf = !_mostrarCpf),
+                                  tooltip: _mostrarSenha ? 'Ocultar' : 'Mostrar',
+                                  icon: Icon(_mostrarSenha ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                                  onPressed: () => setState(() => _mostrarSenha = !_mostrarSenha),
                                 ),
                               ),
-                              validator: Validators.validaCpf,
+                              validator: Validators.validaSenha,
                             ),
                             if (_erro != null) ...[
                               const SizedBox(height: 14),

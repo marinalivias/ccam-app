@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#0b1220",
     "theme_color": "#0b1220",
-    "description": "A new Flutter project.",
+    "description": "App do aluno CCAM: treinos, avisos e mensalidades da academia.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

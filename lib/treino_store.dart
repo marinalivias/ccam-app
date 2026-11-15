@@ -22,6 +22,16 @@ class TreinoStore extends ChangeNotifier {
 
   TreinoRealizado? realizadoEm(DateTime data) => _realizados[Helpers.isoData(data)];
 
+  List<TreinoRealizado> realizadosEntre(DateTime de, DateTime ate) =>
+      _realizados.values.where((t) => !t.data.isBefore(de) && !t.data.isAfter(ate)).toList()..sort((a, b) => a.data.compareTo(b.data));
+
+  Exercicio? exercicioPorId(String id) {
+    for (final e in ficha) {
+      if (e.id == id) return e;
+    }
+    return null;
+  }
+
   Set<String> feitosEm(DateTime data) => realizadoEm(data)?.idsFeitos ?? {};
 
   Registro? registroDe(DateTime data, String exercicioId) => realizadoEm(data)?.registros[exercicioId];

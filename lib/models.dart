@@ -193,36 +193,6 @@ class Aviso {
       );
 }
 
-class Aniversariante {
-  final String id;
-  final String nome;
-  final int dia;
-  final int mes;
-  final bool hoje;
-  final bool voce;
-  final bool parabensEnviado;
-
-  Aniversariante({
-    required this.id,
-    required this.nome,
-    required this.dia,
-    required this.mes,
-    required this.hoje,
-    required this.voce,
-    required this.parabensEnviado,
-  });
-
-  factory Aniversariante.fromJson(Map<String, dynamic> j) => Aniversariante(
-        id: j['id'].toString(),
-        nome: (j['nome'] ?? '').toString(),
-        dia: (j['dia'] as num).toInt(),
-        mes: (j['mes'] as num).toInt(),
-        hoje: j['hoje'] == true,
-        voce: j['voce'] == true,
-        parabensEnviado: j['parabensEnviado'] == true,
-      );
-}
-
 class Produto {
   final String id;
   final String nome;
@@ -271,37 +241,33 @@ class Loja {
       );
 }
 
-class Notificacao {
-  final String id;
-  final String remetente;
-  final DateTime? criadoEm;
-  final bool lido;
-
-  Notificacao({required this.id, required this.remetente, this.criadoEm, required this.lido});
-
-  factory Notificacao.fromJson(Map<String, dynamic> j) => Notificacao(
-        id: j['id'].toString(),
-        remetente: (j['remetente'] ?? '').toString(),
-        criadoEm: j['criadoEm'] != null ? DateTime.tryParse(j['criadoEm']) : null,
-        lido: j['lido'] == true,
-      );
-}
-
 class Mensalidade {
   final String id;
   final DateTime vencimento;
   final double valor;
   final String status;
+  final DateTime? dataPagamento;
+  final DateTime? pagamentoInformadoEm;
 
-  Mensalidade({required this.id, required this.vencimento, required this.valor, required this.status});
+  Mensalidade({
+    required this.id,
+    required this.vencimento,
+    required this.valor,
+    required this.status,
+    this.dataPagamento,
+    this.pagamentoInformadoEm,
+  });
 
   bool get paga => status == 'Pago';
+  bool get informada => !paga && pagamentoInformadoEm != null;
 
   factory Mensalidade.fromJson(Map<String, dynamic> j) => Mensalidade(
         id: j['id'].toString(),
         vencimento: DateTime.parse(j['vencimento']),
         valor: (j['valor'] as num).toDouble(),
         status: (j['status'] ?? '').toString(),
+        dataPagamento: j['dataPagamento'] != null ? DateTime.tryParse(j['dataPagamento']) : null,
+        pagamentoInformadoEm: j['pagamentoInformadoEm'] != null ? DateTime.tryParse(j['pagamentoInformadoEm']) : null,
       );
 }
 
@@ -322,5 +288,23 @@ class ItemCatalogo {
         grupoMuscular: (j['grupoMuscular'] ?? 'Geral').toString(),
         imagemUrl: j['imagemUrl']?.toString(),
         instrucoes: j['instrucoes']?.toString(),
+      );
+}
+
+class Notificacao {
+  final String id;
+  final String tipo;
+  final String titulo;
+  final String texto;
+  final DateTime data;
+
+  Notificacao({required this.id, required this.tipo, required this.titulo, required this.texto, required this.data});
+
+  factory Notificacao.fromJson(Map<String, dynamic> j) => Notificacao(
+        id: j['id'].toString(),
+        tipo: (j['tipo'] ?? '').toString(),
+        titulo: (j['titulo'] ?? '').toString(),
+        texto: (j['texto'] ?? '').toString(),
+        data: DateTime.tryParse((j['data'] ?? '').toString()) ?? DateTime.now(),
       );
 }
