@@ -140,14 +140,7 @@ class _LojaScreenState extends State<LojaScreen> {
                           scrollDirection: Axis.horizontal,
                           children: [
                             for (final c in [null, ...categorias])
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: ChoiceChip(
-                                  label: Text(c ?? 'Todas'),
-                                  selected: _categoria == c,
-                                  onSelected: (_) => setState(() => _categoria = c),
-                                ),
-                              ),
+                              BotaoFiltro(rotulo: c ?? 'Todas', selecionado: _categoria == c, onTap: () => setState(() => _categoria = c)),
                           ],
                         ),
                       ),

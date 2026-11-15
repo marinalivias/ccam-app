@@ -42,7 +42,7 @@ class Notificacoes {
     if (_pronto) return true;
     tzdata.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('America/Sao_Paulo'));
-    await _plugin.initialize(settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')));
+    await _plugin.initialize(settings: const InitializationSettings(android: AndroidInitializationSettings('@drawable/ic_launcher_frente')));
     _pronto = true;
     return true;
   }
@@ -77,7 +77,7 @@ class Notificacoes {
           priority: Priority.high,
           playSound: true,
           enableVibration: true,
-          icon: '@mipmap/ic_launcher',
+          icon: '@drawable/ic_launcher_frente',
         ),
       );
 

@@ -366,18 +366,15 @@ class _EvolucaoState extends State<_Evolucao> {
                     style: TextStyle(color: Cores.textoSuave, fontSize: 13, height: 1.4))
               else ...[
                 SizedBox(
-                  height: 38,
+                  height: 40,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
                       for (final id in opcoes)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(store.exercicioPorId(id)?.nome ?? ''),
-                            selected: id == escolhido,
-                            onSelected: (_) => setState(() => _exercicio = id),
-                          ),
+                        BotaoFiltro(
+                          rotulo: store.exercicioPorId(id)?.nome ?? '',
+                          selecionado: id == escolhido,
+                          onTap: () => setState(() => _exercicio = id),
                         ),
                     ],
                   ),
