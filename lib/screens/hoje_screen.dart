@@ -1,11 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
-import '../notificacoes.dart';
+import '../descanso.dart';
 import '../social_store.dart';
 import '../theme.dart';
 import '../treino_store.dart';
@@ -367,75 +366,27 @@ class CronometroDescanso extends StatefulWidget {
 }
 
 class _CronometroDescansoState extends State<CronometroDescanso> {
-  Timer? _timer;
-  int _restante = 0;
-  int _total = 0;
+  final _descanso = Descanso.instancia;
 
-  void _iniciar(int segundos) {
-    _timer?.cancel();
-    setState(() {
-      _restante = segundos;
-      _total = segundos;
-    });
-    Notificacoes.iniciarDescanso(segundos);
-    final fim = DateTime.now().add(Duration(seconds: segundos));
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) return;
-      final falta = fim.difference(DateTime.now()).inMilliseconds;
-      setState(() => _restante = falta <= 0 ? 0 : (falta / 1000).ceil());
-      if (_restante == 0) {
-        t.cancel();
-        final naTela = WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
-        Notificacoes.descansoTerminou(emPrimeiroPlano: naTela);
-        if (naTela) _avisarFim();
-      }
-    });
+  @override
+  void initState() {
+    super.initState();
+    _descanso.addListener(_atualizar);
   }
 
-  Future<void> _avisarFim() async {
-    SystemSound.play(SystemSoundType.alert);
-    HapticFeedback.heavyImpact();
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.timer_off_rounded, color: Cores.verde, size: 40),
-        title: const Text(
-          'Descanso terminou',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-        content: const Text(
-          'Hora da próxima série!',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Cores.textoSuave),
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(ctx),
-            icon: const Icon(Icons.fitness_center_rounded, size: 18),
-            label: const Text('Bora treinar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _parar() {
-    _timer?.cancel();
-    Notificacoes.pararDescanso();
-    setState(() => _restante = 0);
+  void _atualizar() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _descanso.removeListener(_atualizar);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final ativo = _restante > 0;
+    final ativo = _descanso.ativo;
     return Cartao(
       padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
       child: Column(
@@ -445,7 +396,7 @@ class _CronometroDescansoState extends State<CronometroDescanso> {
               Icon(Icons.timer_outlined, color: ativo ? Cores.verde : Cores.lilas, size: 22),
               const SizedBox(width: 10),
               Text(
-                ativo ? Helpers.formatarTempoDescanso(_restante) : 'Descanso',
+                ativo ? Helpers.formatarTempoDescanso(_descanso.restante) : 'Descanso',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: ativo ? 20 : 15,
@@ -454,14 +405,14 @@ class _CronometroDescansoState extends State<CronometroDescanso> {
               ),
               const Spacer(),
               for (final s in const [60, 90, 120]) ...[
-                _BotaoTempo(rotulo: s % 60 == 0 ? '${s ~/ 60}min' : '${s / 60}min'.replaceAll('.', ','), onTap: () => _iniciar(s)),
+                _BotaoTempo(rotulo: s % 60 == 0 ? '${s ~/ 60}min' : '${s / 60}min'.replaceAll('.', ','), onTap: () => _descanso.iniciar(s)),
                 const SizedBox(width: 6),
               ],
               if (ativo)
                 IconButton(
                   visualDensity: VisualDensity.compact,
                   tooltip: 'Parar',
-                  onPressed: _parar,
+                  onPressed: _descanso.parar,
                   icon: const Icon(Icons.stop_circle_rounded, color: Cores.vermelhoClaro),
                 ),
             ],
@@ -471,7 +422,7 @@ class _CronometroDescansoState extends State<CronometroDescanso> {
             ClipRRect(
               borderRadius: BorderRadius.circular(99),
               child: LinearProgressIndicator(
-                value: _total == 0 ? 0 : _restante / _total,
+                value: _descanso.total == 0 ? 0 : _descanso.restante / _descanso.total,
                 minHeight: 5,
                 backgroundColor: Cores.superficie2,
                 valueColor: const AlwaysStoppedAnimation(Cores.verde),

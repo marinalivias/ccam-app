@@ -77,39 +77,13 @@ class Logo extends StatelessWidget {
           borderRadius: BorderRadius.circular(tamanho * 0.29),
           gradient: RadialGradient(
             center: const Alignment(-0.4, -0.4),
-            radius: 0.44,
+            radius: 0.5,
             colors: [Colors.white.withValues(alpha: 0.55), Colors.white.withValues(alpha: 0)],
-            stops: const [0, 0.55],
           ),
         ),
-        child: CustomPaint(painter: _Halter()),
       ),
     );
   }
-}
-
-class _Halter extends CustomPainter {
-  static const _pecas = [
-    (14.0, 29.5, 36.0, 5.0, 2.5, 1.0),
-    (18.0, 17.0, 8.0, 30.0, 3.0, 1.0),
-    (38.0, 17.0, 8.0, 30.0, 3.0, 1.0),
-    (11.0, 22.0, 6.0, 20.0, 2.5, 0.75),
-    (47.0, 22.0, 6.0, 20.0, 2.5, 0.75),
-  ];
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final u = size.width / 64;
-    for (final (x, y, w, h, r, a) in _pecas) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(x * u, y * u, w * u, h * u), Radius.circular(r * u)),
-        Paint()..color = Colors.white.withValues(alpha: a),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_Halter old) => false;
 }
 
 class Cartao extends StatelessWidget {

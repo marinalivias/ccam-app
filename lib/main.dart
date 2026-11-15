@@ -3,12 +3,11 @@ import 'package:flutter/services.dart';
 
 import 'api.dart';
 import 'models.dart';
+import 'navegacao.dart';
 import 'screens/inicio_shell.dart';
 import 'screens/login_screen.dart';
 import 'theme.dart';
 import 'widgets/comum.dart';
-
-final navegador = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

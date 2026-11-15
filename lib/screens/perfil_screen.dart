@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../descanso.dart';
 import '../models.dart';
 import '../notificacoes.dart';
 import '../theme.dart';
@@ -44,6 +45,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     try {
       await Api.instancia.post('/logout');
     } catch (_) {}
+    Descanso.instancia.parar();
     await Notificacoes.aoSair();
     await Api.instancia.limparToken();
     if (!mounted) return;
