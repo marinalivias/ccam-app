@@ -9,3 +9,9 @@ String get apiUrl {
   }
   return 'http://localhost:8081/api';
 }
+
+String? urlImagem(String? url) {
+  if (url == null || url.isEmpty) return null;
+  if (url.startsWith('http')) return url;
+  return apiUrl.replaceFirst(RegExp(r'/api/?$'), '') + url;
+}

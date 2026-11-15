@@ -51,6 +51,19 @@ class Exercicio {
     this.imagemUrl,
   });
 
+  int get totalSeries {
+    final m = RegExp(r'\d+').firstMatch(series);
+    final n = m == null ? 1 : int.parse(m.group(0)!);
+    return n.clamp(1, 20);
+  }
+
+  int? get alvoReps {
+    final r = repeticoes.toLowerCase();
+    if (r.contains('seg') || r.contains('min') || r.contains('"')) return null;
+    final m = RegExp(r'\d+').firstMatch(r);
+    return m == null ? null : int.parse(m.group(0)!);
+  }
+
   String get resumo {
     final c = (carga ?? '').isNotEmpty ? '  ·  $carga' : '';
     return '$series x $repeticoes$c';
@@ -68,31 +81,59 @@ class Exercicio {
       );
 }
 
+class Registro {
+  final String exercicioId;
+  final List<int> reps;
+  final String? carga;
+  final bool completo;
+
+  Registro({required this.exercicioId, required this.reps, this.carga, required this.completo});
+
+  factory Registro.fromJson(Map<String, dynamic> j) => Registro(
+        exercicioId: j['exercicioId'].toString(),
+        reps: ((j['reps'] as List?) ?? []).map((e) => (e as num).toInt()).toList(),
+        carga: j['carga']?.toString(),
+        completo: j['completo'] == true,
+      );
+}
+
 class TreinoRealizado {
   final DateTime data;
   final int previstos;
   final int feitos;
+  final int seriesPrevistas;
+  final int seriesFeitas;
   final bool concluido;
   final Set<String> idsFeitos;
   final String? observacao;
+  final Map<String, Registro> registros;
 
   TreinoRealizado({
     required this.data,
     required this.previstos,
     required this.feitos,
+    this.seriesPrevistas = 0,
+    this.seriesFeitas = 0,
     required this.concluido,
     required this.idsFeitos,
     this.observacao,
+    this.registros = const {},
   });
 
-  factory TreinoRealizado.fromJson(Map<String, dynamic> j) => TreinoRealizado(
-        data: DateTime.parse(j['data']),
-        previstos: (j['exerciciosPrevistos'] as num?)?.toInt() ?? 0,
-        feitos: (j['exerciciosFeitos'] as num?)?.toInt() ?? 0,
-        concluido: j['concluido'] == true,
-        idsFeitos: ((j['idsFeitos'] as List?) ?? []).map((e) => e.toString()).toSet(),
-        observacao: j['observacao']?.toString(),
-      );
+  factory TreinoRealizado.fromJson(Map<String, dynamic> j) {
+    final regs = ((j['exercicios'] as List?) ?? []).map((e) => Registro.fromJson(e)).toList();
+    return TreinoRealizado(
+      data: DateTime.parse(j['data']),
+      previstos: (j['exerciciosPrevistos'] as num?)?.toInt() ?? 0,
+      feitos: (j['exerciciosFeitos'] as num?)?.toInt() ?? 0,
+      seriesPrevistas: (j['seriesPrevistas'] as num?)?.toInt() ?? 0,
+      seriesFeitas: (j['seriesFeitas'] as num?)?.toInt() ?? 0,
+      concluido: j['concluido'] == true,
+      idsFeitos: ((j['idsFeitos'] as List?) ?? []).map((e) => e.toString()).toSet(),
+      observacao: j['observacao']?.toString(),
+      registros: {for (final r in regs) r.exercicioId: r},
+    );
+  }
 }
 
 class Frequencia {
@@ -269,13 +310,17 @@ class ItemCatalogo {
   final String nome;
   final String grupoMuscular;
   final String? imagemUrl;
+  final String? instrucoes;
 
-  ItemCatalogo({required this.id, required this.nome, required this.grupoMuscular, this.imagemUrl});
+  ItemCatalogo({required this.id, required this.nome, required this.grupoMuscular, this.imagemUrl, this.instrucoes});
+
+  List<String> get passos => (instrucoes ?? '').split('\n').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
 
   factory ItemCatalogo.fromJson(Map<String, dynamic> j) => ItemCatalogo(
         id: (j['id'] as num).toInt(),
         nome: (j['nome'] ?? '').toString(),
         grupoMuscular: (j['grupoMuscular'] ?? 'Geral').toString(),
         imagemUrl: j['imagemUrl']?.toString(),
+        instrucoes: j['instrucoes']?.toString(),
       );
 }

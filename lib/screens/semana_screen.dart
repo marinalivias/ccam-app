@@ -6,6 +6,7 @@ import '../treino_store.dart';
 import '../utils/helpers.dart';
 import '../widgets/comum.dart';
 import '../widgets/exercicio_widgets.dart';
+import 'minha_ficha_screen.dart';
 
 class SemanaScreen extends StatefulWidget {
   final TreinoStore store;
@@ -64,9 +65,20 @@ class _SemanaScreenState extends State<SemanaScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               children: [
-                const Text('Agenda da semana', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Agenda da semana', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MinhaFichaScreen(store: store))),
+                      icon: const Icon(Icons.edit_note_rounded, size: 20),
+                      label: const Text('Minha ficha'),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 4),
-                const Text('Toque em um dia para ver o treino e marcar o que fez.',
+                const Text('Toque em um dia para ver o treino e registrar o que fez.',
                     style: TextStyle(color: Cores.textoSuave, fontSize: 13.5)),
                 const SizedBox(height: 18),
                 Cartao(
@@ -119,7 +131,10 @@ class _SemanaScreenState extends State<SemanaScreen> {
                   )
                 else ...[
                   if (!futuro) ...[
-                    Cartao(child: BarraProgresso(feitos: feitos.length, total: lista.length)),
+                    Builder(builder: (_) {
+                      final (feitas, total) = store.progressoSeries(_selecionado);
+                      return Cartao(child: BarraProgresso(feitos: feitas, total: total));
+                    }),
                     const SizedBox(height: 12),
                   ] else
                     const Padding(
@@ -129,6 +144,9 @@ class _SemanaScreenState extends State<SemanaScreen> {
                   for (final ex in lista)
                     LinhaExercicio(
                       exercicio: ex,
+                      gif: store.gifDe(ex),
+                      seriesFeitas: store.seriesFeitas(_selecionado, ex),
+                      iniciado: store.registroDe(_selecionado, ex.id) != null,
                       feito: feitos.contains(ex.id),
                       podeMarcar: _podeMarcar(_selecionado),
                       onMarcar: () async {
@@ -138,7 +156,7 @@ class _SemanaScreenState extends State<SemanaScreen> {
                           if (context.mounted) mostrarMensagem(context, e.mensagem, erro: true);
                         }
                       },
-                      onAbrir: () => abrirDetalhes(context, store, ex),
+                      onAbrir: () => abrirDetalhes(context, store, ex, data: _selecionado),
                     ),
                   if (realizado?.observacao != null)
                     Cartao(

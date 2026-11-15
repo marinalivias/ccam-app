@@ -136,15 +136,21 @@ class HojeScreen extends StatelessWidget {
                     ),
                   )
                 else ...[
-                  Cartao(child: BarraProgresso(feitos: feitos.length, total: lista.length)),
+                  Builder(builder: (_) {
+                    final (feitas, total) = store.progressoSeries(hoje);
+                    return Cartao(child: BarraProgresso(feitos: feitas, total: total));
+                  }),
                   const SizedBox(height: 12),
                   for (final ex in lista)
                     LinhaExercicio(
                       exercicio: ex,
+                      gif: store.gifDe(ex),
                       feito: feitos.contains(ex.id),
+                      seriesFeitas: store.seriesFeitas(hoje, ex),
+                      iniciado: store.registroDe(hoje, ex.id) != null,
                       podeMarcar: true,
                       onMarcar: () => _marcar(context, hoje, ex.id),
-                      onAbrir: () => abrirDetalhes(context, store, ex),
+                      onAbrir: () => abrirDetalhes(context, store, ex, data: hoje),
                     ),
                   const SizedBox(height: 4),
                   Row(

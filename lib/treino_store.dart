@@ -8,6 +8,8 @@ class TreinoStore extends ChangeNotifier {
   final _api = Api.instancia;
 
   List<Exercicio> ficha = [];
+  List<ItemCatalogo> catalogo = [];
+  Map<String, ItemCatalogo> _porNome = {};
   final Map<String, TreinoRealizado> _realizados = {};
   Frequencia? frequencia;
   bool carregando = false;
@@ -22,6 +24,56 @@ class TreinoStore extends ChangeNotifier {
 
   Set<String> feitosEm(DateTime data) => realizadoEm(data)?.idsFeitos ?? {};
 
+  Registro? registroDe(DateTime data, String exercicioId) => realizadoEm(data)?.registros[exercicioId];
+
+  ItemCatalogo? doCatalogo(String nome) => _porNome[nome.trim().toLowerCase()];
+
+  String? gifDe(Exercicio ex) => ex.imagemUrl ?? doCatalogo(ex.nome)?.imagemUrl;
+
+  int seriesFeitas(DateTime data, Exercicio ex) {
+    final r = registroDe(data, ex.id);
+    if (r == null) return feitosEm(data).contains(ex.id) ? ex.totalSeries : 0;
+    final meta = ex.alvoReps ?? 1;
+    return r.reps.where((v) => v >= meta).length;
+  }
+
+  (int, int) progressoSeries(DateTime data) {
+    var feitas = 0;
+    var total = 0;
+    for (final ex in doDia(data)) {
+      total += ex.totalSeries;
+      feitas += seriesFeitas(data, ex);
+    }
+    return (feitas, total);
+  }
+
+  Future<void> carregarCatalogo() async {
+    if (catalogo.isNotEmpty) return;
+    final lista = await _api.get('/catalogo') as List;
+    catalogo = lista.map((e) => ItemCatalogo.fromJson(e)).toList();
+    _porNome = {for (final c in catalogo) c.nome.toLowerCase(): c};
+    notifyListeners();
+  }
+
+  Future<void> registrar(DateTime data, String exercicioId, List<int> reps, String? carga) async {
+    final chave = Helpers.isoData(data);
+    final resp = await _api.put('/treinos-realizados/$chave/exercicios/$exercicioId', {'reps': reps, 'carga': carga});
+    if (resp is Map<String, dynamic>) {
+      _realizados[chave] = TreinoRealizado.fromJson(resp);
+    } else {
+      _realizados.remove(chave);
+    }
+    await carregarFrequencia(avisar: false);
+    notifyListeners();
+  }
+
+  Future<void> limparFicha() async {
+    await _api.delete('/treino');
+    ficha = [];
+    await carregarFrequencia(avisar: false);
+    notifyListeners();
+  }
+
   Future<void> carregar() async {
     carregando = true;
     erro = null;
@@ -30,6 +82,11 @@ class TreinoStore extends ChangeNotifier {
       final lista = await _api.get('/treino') as List;
       ficha = lista.map((e) => Exercicio.fromJson(e)).toList();
       final hoje = Helpers.soData(DateTime.now());
+      try {
+        await carregarCatalogo();
+      } on ApiException {
+        catalogo = [];
+      }
       await carregarPeriodo(Helpers.segundaDaSemana(hoje).subtract(const Duration(days: 35)), hoje, avisar: false);
       await carregarFrequencia(avisar: false);
     } on ApiException catch (e) {
@@ -78,6 +135,7 @@ class TreinoStore extends ChangeNotifier {
       concluido: ids.length >= doDia(data).length && ids.isNotEmpty,
       idsFeitos: ids,
       observacao: observacao,
+      registros: anterior?.registros ?? const {},
     );
     if (ids.isEmpty) _realizados.remove(chave);
     notifyListeners();
@@ -105,7 +163,7 @@ class TreinoStore extends ChangeNotifier {
     }
   }
 
-  Future<void> adicionar(int catalogoId, Map<String, String?> dados) async {
+  Future<void> adicionar(int? catalogoId, Map<String, String?> dados) async {
     final novo = await _api.post('/treino', {'catalogoId': catalogoId, ...dados});
     ficha = [...ficha, Exercicio.fromJson(novo)];
     await carregarFrequencia(avisar: false);
