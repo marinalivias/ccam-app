@@ -96,7 +96,7 @@ class LinhaExercicio extends StatelessWidget {
                     Selo('$seriesFeitas de ${exercicio.totalSeries} séries', tipo: TipoSelo.aviso)
                   else
                     Text(
-                      podeMarcar ? 'Toque para ver como fazer e registrar' : 'Toque para ver como fazer',
+                      'Toque para ver como fazer',
                       style: const TextStyle(color: Cores.textoFraco, fontSize: 12),
                     ),
                 ],
@@ -170,46 +170,127 @@ bool podeRegistrar(DateTime data) {
   return !data.isAfter(hoje) && !data.isBefore(hoje.subtract(const Duration(days: 30)));
 }
 
-Future<void> abrirDetalhes(BuildContext context, TreinoStore store, Exercicio ex, {DateTime? data}) {
+Future<void> abrirDemonstracao(BuildContext context, TreinoStore store, Exercicio ex) {
+  final gif = urlImagem(store.gifDe(ex));
+  final passos = store.doCatalogo(ex.nome)?.passos ?? const <String>[];
+  return showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) => Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (gif != null)
+                Container(
+                  color: Colors.white,
+                  child: Image.network(
+                    gif,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (c, child, p) => p == null ? child : const SizedBox(height: 260, child: Center(child: CircularProgressIndicator())),
+                    errorBuilder: (_, _, _) => const SizedBox(height: 80, child: Center(child: Text('Demonstração indisponível', style: TextStyle(color: Colors.black54)))),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(ex.nome, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text('${ex.resumo}${ex.grupoMuscular != null ? '  ·  ${ex.grupoMuscular}' : ''}', style: const TextStyle(color: Cores.textoSuave)),
+                    const SizedBox(height: 14),
+                    if (passos.isEmpty)
+                      const Text('Sem passo a passo para este exercício.', style: TextStyle(color: Cores.textoFraco))
+                    else
+                      for (var i = 0; i < passos.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(color: Cores.marca.withValues(alpha: 0.25), shape: BoxShape.circle),
+                                child: Text('${i + 1}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFFDDD6FE))),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(passos[i], style: const TextStyle(color: Cores.textoSuave, height: 1.45))),
+                            ],
+                          ),
+                        ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fechar')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Future<void> abrirRegistro(BuildContext context, TreinoStore store, Exercicio ex, DateTime data) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (ctx) => _Detalhes(store: store, exercicio: ex, data: data, contextoTela: context),
+    builder: (_) => _Registro(store: store, exercicio: ex, data: data, contextoTela: context),
   );
 }
 
-class _Detalhes extends StatefulWidget {
+class _Registro extends StatefulWidget {
   final TreinoStore store;
   final Exercicio exercicio;
-  final DateTime? data;
+  final DateTime data;
   final BuildContext contextoTela;
 
-  const _Detalhes({required this.store, required this.exercicio, this.data, required this.contextoTela});
+  const _Registro({required this.store, required this.exercicio, required this.data, required this.contextoTela});
 
   @override
-  State<_Detalhes> createState() => _DetalhesState();
+  State<_Registro> createState() => _RegistroState();
 }
 
-class _DetalhesState extends State<_Detalhes> {
+class _RegistroState extends State<_Registro> {
   late final List<int> _reps;
   late final TextEditingController _carga;
+  bool? _completou;
   bool _salvando = false;
+  late final bool _jaRegistrado;
 
   Exercicio get ex => widget.exercicio;
-  bool get _registra => widget.data != null && podeRegistrar(widget.data!);
   int get _meta => ex.alvoReps ?? 1;
   bool get _porTempo => ex.alvoReps == null;
 
   @override
   void initState() {
     super.initState();
-    final r = widget.data == null ? null : widget.store.registroDe(widget.data!, ex.id);
-    final completo = widget.data != null && widget.store.feitosEm(widget.data!).contains(ex.id);
+    final r = widget.store.registroDe(widget.data, ex.id);
+    final completo = widget.store.feitosEm(widget.data).contains(ex.id);
+    _jaRegistrado = r != null || completo;
     _reps = List.generate(ex.totalSeries, (i) {
       if (r != null && i < r.reps.length) return r.reps[i];
-      return completo ? _meta : 0;
+      return completo ? _meta : _meta;
     });
+    if (_jaRegistrado) _completou = completo || (r != null && r.completo);
+    if (_completou == false && r != null) {
+      for (var i = 0; i < _reps.length; i++) {
+        _reps[i] = i < r.reps.length ? r.reps[i] : 0;
+      }
+    }
     _carga = TextEditingController(text: r?.carga ?? ex.carga ?? '');
   }
 
@@ -219,26 +300,13 @@ class _DetalhesState extends State<_Detalhes> {
     super.dispose();
   }
 
-  Future<void> _salvar({bool tudo = false}) async {
-    if (tudo) {
-      setState(() {
-        for (var i = 0; i < _reps.length; i++) {
-          _reps[i] = _meta;
-        }
-      });
-    }
+  Future<void> _enviar(List<int> reps, String mensagem) async {
     setState(() => _salvando = true);
     try {
-      await widget.store.registrar(widget.data!, ex.id, List.of(_reps), _carga.text.trim().isEmpty ? null : _carga.text.trim());
+      await widget.store.registrar(widget.data, ex.id, reps, _carga.text.trim().isEmpty ? null : _carga.text.trim());
       if (!mounted) return;
       Navigator.pop(context);
-      final feitas = _reps.where((v) => v >= _meta).length;
-      if (widget.contextoTela.mounted) {
-        mostrarMensagem(
-          widget.contextoTela,
-          feitas == _reps.length ? '${ex.nome}: todas as séries feitas!' : '${ex.nome}: $feitas de ${_reps.length} séries registradas.',
-        );
-      }
+      if (widget.contextoTela.mounted) mostrarMensagem(widget.contextoTela, mensagem);
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.mensagem, erro: true);
     } finally {
@@ -246,12 +314,53 @@ class _DetalhesState extends State<_Detalhes> {
     }
   }
 
+  void _confirmar() {
+    if (_completou == true) {
+      _enviar(List.filled(_reps.length, _meta), '${ex.nome}: todas as séries feitas!');
+      return;
+    }
+    final feitas = _reps.where((v) => v >= _meta).length;
+    if (_reps.every((v) => v == 0)) {
+      mostrarMensagem(context, 'Marque pelo menos uma série ou toque em Desmarcar.', erro: true);
+      return;
+    }
+    _enviar(List.of(_reps), '${ex.nome}: $feitas de ${_reps.length} séries completas.');
+  }
+
+  Widget _opcao(bool valor, IconData icone, String titulo, String texto, Color cor) {
+    final ativo = _completou == valor;
+    return Cartao(
+      padding: const EdgeInsets.all(14),
+      corBorda: ativo ? cor : null,
+      onTap: () => setState(() {
+        _completou = valor;
+        if (!valor && _reps.every((v) => v >= _meta)) {
+          for (var i = 0; i < _reps.length; i++) {
+            _reps[i] = i < _reps.length - 1 ? _meta : 0;
+          }
+        }
+      }),
+      child: Row(
+        children: [
+          Icon(icone, color: ativo ? cor : Cores.textoFraco, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                Text(texto, style: const TextStyle(color: Cores.textoSuave, fontSize: 13)),
+              ],
+            ),
+          ),
+          Icon(ativo ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: ativo ? cor : Cores.textoFraco),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cat = widget.store.doCatalogo(ex.nome);
-    final gif = urlImagem(widget.store.gifDe(ex));
-    final passos = cat?.passos ?? const <String>[];
-
     return SafeArea(
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
@@ -259,61 +368,18 @@ class _DetalhesState extends State<_Detalhes> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(ex.nome, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            if (ex.grupoMuscular != null)
-              Padding(padding: const EdgeInsets.only(top: 4), child: Text(ex.grupoMuscular!, style: const TextStyle(color: Cores.textoSuave))),
-            const SizedBox(height: 14),
-            if (gif != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  color: Colors.white,
-                  child: Image.network(
-                    gif,
-                    height: 220,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (c, child, p) => p == null ? child : const SizedBox(height: 220, child: Center(child: CircularProgressIndicator())),
-                    errorBuilder: (_, _, _) => const SizedBox(height: 60, child: Center(child: Text('Demonstração indisponível'))),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                _Dado('Séries', ex.series),
-                _Dado('Repetições', ex.repeticoes),
-                _Dado('Carga', (ex.carga ?? '').isEmpty ? 'Livre' : ex.carga!),
-              ],
-            ),
-            if (passos.isNotEmpty) ...[
-              const TituloSecao('Como executar'),
-              for (var i = 0; i < passos.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(color: Cores.marca.withValues(alpha: 0.25), shape: BoxShape.circle),
-                        child: Text('${i + 1}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFFDDD6FE))),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(passos[i], style: const TextStyle(color: Cores.textoSuave, height: 1.45))),
-                    ],
-                  ),
-                ),
-            ],
-            if (_registra) ...[
-              TituloSecao(Helpers.mesmoDia(widget.data!, DateTime.now()) ? 'Como foi hoje' : 'Como foi em ${Helpers.dataCurta(widget.data!)}'),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text('Toque na série para marcar como completa. Se fez menos repetições, ajuste no - e +.',
-                    style: TextStyle(color: Cores.textoFraco, fontSize: 12.5)),
-              ),
+            const SizedBox(height: 2),
+            Text(ex.resumo, style: const TextStyle(color: Cores.textoSuave)),
+            const SizedBox(height: 16),
+            const Text('Você completou todas as séries?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            const SizedBox(height: 10),
+            _opcao(true, Icons.check_circle_rounded, 'Sim, completei todas', '${ex.totalSeries} séries de ${ex.repeticoes}', Cores.verde),
+            const SizedBox(height: 8),
+            _opcao(false, Icons.timelapse_rounded, 'Não completei todas', 'Marque quanto você fez em cada série', Cores.amarelo),
+            if (_completou == false) ...[
+              const SizedBox(height: 12),
               Cartao(
-                padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
                 child: Column(
                   children: [
                     for (var i = 0; i < _reps.length; i++) ...[
@@ -330,63 +396,26 @@ class _DetalhesState extends State<_Detalhes> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _carga,
-                decoration: const InputDecoration(labelText: 'Carga que você usou', hintText: 'Ex: 20kg'),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _salvando ? null : () => _salvar(tudo: true),
-                      icon: const Icon(Icons.done_all_rounded, size: 18),
-                      label: const Text('Fiz tudo'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(child: BotaoMarca(texto: 'Salvar', icone: Icons.check_rounded, carregando: _salvando, onPressed: _salvar)),
-                ],
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text('Toque na série para marcar completa ou ajuste as repetições no - e +.',
+                    style: TextStyle(color: Cores.textoFraco, fontSize: 12.5)),
               ),
             ],
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton.icon(
-                    style: TextButton.styleFrom(foregroundColor: Cores.vermelhoClaro),
-                    onPressed: () async {
-                      final ok = await confirmar(context,
-                          titulo: 'Remover exercício?',
-                          mensagem: '${ex.nome} sai da sua ficha. Seu professor vê essa alteração no histórico.',
-                          botao: 'Remover',
-                          perigo: true);
-                      if (!ok || !context.mounted) return;
-                      try {
-                        await widget.store.remover(ex.id);
-                        if (context.mounted) Navigator.pop(context);
-                        if (widget.contextoTela.mounted) mostrarMensagem(widget.contextoTela, 'Exercício removido da ficha.');
-                      } on ApiException catch (e) {
-                        if (context.mounted) mostrarMensagem(context, e.mensagem, erro: true);
-                      }
-                    },
-                    icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                    label: const Text('Remover da ficha'),
-                  ),
-                ),
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      await abrirFormulario(widget.contextoTela, widget.store, exercicio: ex);
-                    },
-                    icon: const Icon(Icons.edit_rounded, size: 20),
-                    label: const Text('Editar exercício'),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 14),
+            TextField(controller: _carga, decoration: const InputDecoration(labelText: 'Carga que você usou', hintText: 'Ex: 20kg')),
+            const SizedBox(height: 16),
+            BotaoMarca(
+              texto: 'Confirmar',
+              icone: Icons.check_rounded,
+              carregando: _salvando,
+              onPressed: _completou == null ? null : _confirmar,
             ),
+            if (_jaRegistrado)
+              TextButton(
+                onPressed: _salvando ? null : () => _enviar(List.filled(_reps.length, 0), '${ex.nome}: registro desfeito.'),
+                child: const Text('Desmarcar este exercício'),
+              ),
           ],
         ),
       ),
@@ -416,7 +445,7 @@ class _LinhaSerie extends StatelessWidget {
     final completa = valor >= meta;
     final cor = completa ? Cores.verde : (valor > 0 ? Cores.amarelo : Cores.textoFraco);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
           Expanded(
@@ -424,7 +453,7 @@ class _LinhaSerie extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               onTap: () => onChanged(completa ? 0 : meta),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                 child: Row(
                   children: [
                     Icon(completa ? Icons.check_circle_rounded : (valor > 0 ? Icons.timelapse_rounded : Icons.circle_outlined), color: cor, size: 26),
@@ -460,7 +489,7 @@ class _LinhaSerie extends StatelessWidget {
               icon: const Icon(Icons.remove_circle_outline_rounded),
             ),
             SizedBox(
-              width: 34,
+              width: 30,
               child: Text('$valor', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: cor == Cores.textoFraco ? Cores.texto : cor)),
             ),
             IconButton(
@@ -470,35 +499,6 @@ class _LinhaSerie extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _Dado extends StatelessWidget {
-  final String rotulo;
-  final String valor;
-
-  const _Dado(this.rotulo, this.valor);
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Cores.superficie,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Cores.borda),
-        ),
-        child: Column(
-          children: [
-            Text(rotulo.toUpperCase(), style: const TextStyle(color: Cores.textoFraco, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6)),
-            const SizedBox(height: 4),
-            Text(valor, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-          ],
-        ),
       ),
     );
   }
@@ -591,6 +591,24 @@ class _FormularioExercicioState extends State<_FormularioExercicio> {
       if (mounted) mostrarMensagem(context, e.mensagem, erro: true);
     } finally {
       if (mounted) setState(() => _salvando = false);
+    }
+  }
+
+  Future<void> _remover() async {
+    final ex = widget.exercicio!;
+    final ok = await confirmar(context,
+        titulo: 'Remover exercício?',
+        mensagem: '${ex.nome} sai da sua ficha. Seu professor vê essa alteração no histórico.',
+        botao: 'Remover',
+        perigo: true);
+    if (!ok || !mounted) return;
+    try {
+      await widget.store.remover(ex.id);
+      if (!mounted) return;
+      Navigator.pop(context);
+      if (widget.contextoTela.mounted) mostrarMensagem(widget.contextoTela, 'Exercício removido da ficha.');
+    } on ApiException catch (e) {
+      if (mounted) mostrarMensagem(context, e.mensagem, erro: true);
     }
   }
 
@@ -690,6 +708,13 @@ class _FormularioExercicioState extends State<_FormularioExercicio> {
               const Text('Seu professor vê no histórico tudo o que você mudar na ficha.', style: TextStyle(color: Cores.textoFraco, fontSize: 12.5)),
               const SizedBox(height: 18),
               BotaoMarca(texto: _editando ? 'Salvar alterações' : 'Adicionar à ficha', icone: Icons.check_rounded, carregando: _salvando, onPressed: _salvar),
+              if (_editando)
+                TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: Cores.vermelhoClaro),
+                  onPressed: _salvando ? null : _remover,
+                  icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                  label: const Text('Remover da ficha'),
+                ),
             ],
           ),
         ),

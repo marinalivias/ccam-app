@@ -10,6 +10,7 @@ import '../treino_store.dart';
 import '../utils/helpers.dart';
 import '../widgets/comum.dart';
 import '../widgets/exercicio_widgets.dart';
+import 'minha_ficha_screen.dart';
 
 class HojeScreen extends StatelessWidget {
   final Aluno aluno;
@@ -23,18 +24,6 @@ class HojeScreen extends StatelessWidget {
     final d = aluno.dataNascimento;
     final hoje = DateTime.now();
     return d != null && d.month == hoje.month && d.day == hoje.day;
-  }
-
-  Future<void> _marcar(BuildContext context, DateTime hoje, String id) async {
-    try {
-      await store.alternar(hoje, id);
-      final r = store.realizadoEm(hoje);
-      if (context.mounted && r != null && r.concluido && r.feitos == store.doDia(hoje).length) {
-        mostrarMensagem(context, 'Treino de hoje completo. Mandou bem!');
-      }
-    } on ApiException catch (e) {
-      if (context.mounted) mostrarMensagem(context, e.mensagem, erro: true);
-    }
   }
 
   Future<void> _observacao(BuildContext context, DateTime hoje) async {
@@ -111,9 +100,9 @@ class HojeScreen extends StatelessWidget {
                 TituloSecao(
                   'Treino de ${Helpers.obterDiaAtual(hoje.weekday).toLowerCase()}',
                   acao: TextButton.icon(
-                    onPressed: () => abrirFormulario(context, store, diaInicial: Helpers.obterDiaAtual(hoje.weekday)),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Adicionar'),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MinhaFichaScreen(store: store))),
+                    icon: const Icon(Icons.edit_note_rounded, size: 18),
+                    label: const Text('Minha ficha'),
                   ),
                 ),
                 if (store.carregando && store.ficha.isEmpty)
@@ -149,34 +138,14 @@ class HojeScreen extends StatelessWidget {
                       seriesFeitas: store.seriesFeitas(hoje, ex),
                       iniciado: store.registroDe(hoje, ex.id) != null,
                       podeMarcar: true,
-                      onMarcar: () => _marcar(context, hoje, ex.id),
-                      onAbrir: () => abrirDetalhes(context, store, ex, data: hoje),
+                      onMarcar: () => abrirRegistro(context, store, ex, hoje),
+                      onAbrir: () => abrirDemonstracao(context, store, ex),
                     ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            try {
-                              await store.marcarTodos(hoje, feitos.length < lista.length);
-                            } on ApiException catch (e) {
-                              if (context.mounted) mostrarMensagem(context, e.mensagem, erro: true);
-                            }
-                          },
-                          icon: Icon(feitos.length < lista.length ? Icons.done_all_rounded : Icons.remove_done_rounded, size: 18),
-                          label: Text(feitos.length < lista.length ? 'Marcar tudo' : 'Desmarcar tudo'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: realizado == null ? null : () => _observacao(context, hoje),
-                          icon: const Icon(Icons.edit_note_rounded, size: 20),
-                          label: Text(realizado?.observacao == null ? 'Anotar' : 'Ver anotação'),
-                        ),
-                      ),
-                    ],
+                  OutlinedButton.icon(
+                    onPressed: realizado == null ? null : () => _observacao(context, hoje),
+                    icon: const Icon(Icons.edit_note_rounded, size: 20),
+                    label: Text(realizado?.observacao == null ? 'Anotar como foi o treino' : 'Ver anotação do treino'),
                   ),
                 ],
               ],

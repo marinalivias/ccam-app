@@ -111,10 +111,13 @@ class MinhaFichaScreen extends StatelessWidget {
                           padding: const EdgeInsets.only(left: 8, bottom: 8),
                           child: Cartao(
                             padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
-                            onTap: () => abrirDetalhes(context, store, ex),
+                            onTap: () => abrirFormulario(context, store, exercicio: ex),
                             child: Row(
                               children: [
-                                Miniatura(store.gifDe(ex), tamanho: 48),
+                                GestureDetector(
+                                  onTap: () => abrirDemonstracao(context, store, ex),
+                                  child: Miniatura(store.gifDe(ex), tamanho: 48),
+                                ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(

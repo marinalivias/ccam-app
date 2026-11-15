@@ -115,14 +115,7 @@ class _SemanaScreenState extends State<SemanaScreen> {
                     ],
                   ),
                 ),
-                TituloSecao(
-                  '${Helpers.obterDiaAtual(_selecionado.weekday)}, ${Helpers.dataPorExtenso(_selecionado)}',
-                  acao: TextButton.icon(
-                    onPressed: () => abrirFormulario(context, store, diaInicial: Helpers.obterDiaAtual(_selecionado.weekday)),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Adicionar'),
-                  ),
-                ),
+                TituloSecao('${Helpers.obterDiaAtual(_selecionado.weekday)}, ${Helpers.dataPorExtenso(_selecionado)}'),
                 if (_carregandoSemana)
                   const Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator()))
                 else if (lista.isEmpty)
@@ -149,14 +142,8 @@ class _SemanaScreenState extends State<SemanaScreen> {
                       iniciado: store.registroDe(_selecionado, ex.id) != null,
                       feito: feitos.contains(ex.id),
                       podeMarcar: _podeMarcar(_selecionado),
-                      onMarcar: () async {
-                        try {
-                          await store.alternar(_selecionado, ex.id);
-                        } on ApiException catch (e) {
-                          if (context.mounted) mostrarMensagem(context, e.mensagem, erro: true);
-                        }
-                      },
-                      onAbrir: () => abrirDetalhes(context, store, ex, data: _selecionado),
+                      onMarcar: () => abrirRegistro(context, store, ex, _selecionado),
+                      onAbrir: () => abrirDemonstracao(context, store, ex),
                     ),
                   if (realizado?.observacao != null)
                     Cartao(
