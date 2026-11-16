@@ -270,6 +270,7 @@ class _RegistroState extends State<_Registro> {
   bool? _completou;
   bool _salvando = false;
   late final bool _jaRegistrado;
+  (DateTime, String)? _ultima;
 
   Exercicio get ex => widget.exercicio;
   int get _meta => ex.alvoReps ?? 1;
@@ -291,7 +292,8 @@ class _RegistroState extends State<_Registro> {
         _reps[i] = i < r.reps.length ? r.reps[i] : 0;
       }
     }
-    _carga = TextEditingController(text: r?.carga ?? ex.carga ?? '');
+    _ultima = widget.store.ultimaCarga(ex.id, widget.data);
+    _carga = TextEditingController(text: r?.carga ?? _ultima?.$2 ?? ex.carga ?? '');
   }
 
   @override
@@ -306,7 +308,9 @@ class _RegistroState extends State<_Registro> {
       await widget.store.registrar(widget.data, ex.id, reps, _carga.text.trim().isEmpty ? null : _carga.text.trim());
       if (!mounted) return;
       Navigator.pop(context);
-      if (widget.contextoTela.mounted) mostrarMensagem(widget.contextoTela, mensagem);
+      if (widget.contextoTela.mounted) {
+        mostrarMensagem(widget.contextoTela, widget.store.guardadoOffline ? 'Sem internet: salvo no celular. Enviamos quando a conexão voltar.' : mensagem);
+      }
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.mensagem, erro: true);
     } finally {
@@ -404,6 +408,24 @@ class _RegistroState extends State<_Registro> {
             ],
             const SizedBox(height: 14),
             TextField(controller: _carga, decoration: const InputDecoration(labelText: 'Carga que você usou', hintText: 'Ex: 20kg')),
+            if (_ultima != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.history_rounded, size: 18, color: Cores.lilas),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Da última vez (${Helpers.dataCurta(_ultima!.$1).substring(0, 5)}) você usou ${_ultima!.$2}.'
+                      '${widget.store.registroDe(widget.data, ex.id)?.carga == null ? ' Já deixamos preenchido.' : ''}'
+                      '${ex.carga != null && ex.carga!.trim().isNotEmpty && ex.carga!.trim() != _ultima!.$2 ? ' Na ficha: ${ex.carga}.' : ''}',
+                      style: const TextStyle(color: Cores.textoSuave, fontSize: 12.5, height: 1.35),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 16),
             BotaoMarca(
               texto: 'Confirmar',

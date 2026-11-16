@@ -57,3 +57,8 @@ android/app/*.jks
 
 # Windows
 Thumbs.db
+
+# Variacoes do .env e pacotes gerados
+.env.*
+*.apk
+*.aab

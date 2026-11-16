@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
-import '../descanso.dart';
 import '../social_store.dart';
 import '../theme.dart';
 import '../treino_store.dart';
@@ -119,8 +118,6 @@ class _HojeScreenState extends State<HojeScreen> {
                 const SizedBox(height: 18),
                 if (_aniversarioHoje) ...[_Aniversario(nome: aluno.primeiroNome, social: social), const SizedBox(height: 12)],
                 _ResumoSemana(store: store, selecionado: dia, onDia: (d) => setState(() => _dia = d)),
-                const SizedBox(height: 12),
-                const CronometroDescanso(),
                 TituloSecao(
                   ehHoje
                       ? 'Treino de ${Helpers.obterDiaAtual(hoje.weekday).toLowerCase()}'
@@ -221,11 +218,7 @@ class _Aniversario extends StatelessWidget {
     return ListenableBuilder(
       listenable: social,
       builder: (context, _) {
-        final loja = social.loja;
-        final linhas = [
-          'A equipe da academia deseja um ótimo dia para você.',
-          if (loja != null && loja.ativa && loja.descontoAniversario > 0) 'Hoje você tem ${loja.descontoAniversario}% de desconto na loja.',
-        ];
+        final linhas = ['A equipe da academia deseja um ótimo dia para você!'];
         return Cartao(
           corBorda: const Color(0x6122C55E),
           child: Row(
@@ -353,110 +346,6 @@ class _ResumoSemana extends StatelessWidget {
             }),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class CronometroDescanso extends StatefulWidget {
-  const CronometroDescanso({super.key});
-
-  @override
-  State<CronometroDescanso> createState() => _CronometroDescansoState();
-}
-
-class _CronometroDescansoState extends State<CronometroDescanso> {
-  final _descanso = Descanso.instancia;
-
-  @override
-  void initState() {
-    super.initState();
-    _descanso.addListener(_atualizar);
-  }
-
-  void _atualizar() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    _descanso.removeListener(_atualizar);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ativo = _descanso.ativo;
-    return Cartao(
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Icon(Icons.timer_outlined, color: ativo ? Cores.verde : Cores.lilas, size: 22),
-              const SizedBox(width: 10),
-              Text(
-                ativo ? Helpers.formatarTempoDescanso(_descanso.restante) : 'Descanso',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: ativo ? 20 : 15,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              const Spacer(),
-              for (final s in const [60, 90, 120]) ...[
-                _BotaoTempo(rotulo: s % 60 == 0 ? '${s ~/ 60}min' : '${s / 60}min'.replaceAll('.', ','), onTap: () => _descanso.iniciar(s)),
-                const SizedBox(width: 6),
-              ],
-              if (ativo)
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Parar',
-                  onPressed: _descanso.parar,
-                  icon: const Icon(Icons.stop_circle_rounded, color: Cores.vermelhoClaro),
-                ),
-            ],
-          ),
-          if (ativo) ...[
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(99),
-              child: LinearProgressIndicator(
-                value: _descanso.total == 0 ? 0 : _descanso.restante / _descanso.total,
-                minHeight: 5,
-                backgroundColor: Cores.superficie2,
-                valueColor: const AlwaysStoppedAnimation(Cores.verde),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _BotaoTempo extends StatelessWidget {
-  final String rotulo;
-  final VoidCallback onTap;
-
-  const _BotaoTempo({required this.rotulo, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: Cores.marca.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Cores.marca.withValues(alpha: 0.4)),
-        ),
-        child: Text(
-          rotulo,
-          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFFDDD6FE)),
-        ),
       ),
     );
   }

@@ -27,14 +27,6 @@ void main() {
     });
   });
 
-  group('Testes de Formatação do Cronômetro |', () {
-    test('Deve formatar os segundos para o formato MM:SS', () {
-      expect(Helpers.formatarTempoDescanso(90), '1:30');
-      expect(Helpers.formatarTempoDescanso(60), '1:00');
-      expect(Helpers.formatarTempoDescanso(5), '0:05');
-    });
-  });
-
   group('Datas e valores |', () {
     test('Segunda da semana', () {
       expect(Helpers.segundaDaSemana(DateTime(2026, 11, 13)), DateTime(2026, 11, 9));

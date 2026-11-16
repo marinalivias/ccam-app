@@ -2,8 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
-import 'package:timezone/timezone.dart' as tz;
 import 'package:workmanager/workmanager.dart';
 
 import 'api.dart';
@@ -27,7 +25,6 @@ class Notificacoes {
   static final _plugin = FlutterLocalNotificationsPlugin();
   static bool _pronto = false;
 
-  static const _idDescanso = 1;
   static const _idNovidades = 100;
   static const _tarefa = 'ccam_novidades';
   static const _chaveAvisadas = 'notificacoes_avisadas';
@@ -40,8 +37,6 @@ class Notificacoes {
   static Future<bool> iniciar() async {
     if (!suportado) return false;
     if (_pronto) return true;
-    tzdata.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('America/Sao_Paulo'));
     await _plugin.initialize(settings: const InitializationSettings(android: AndroidInitializationSettings('@drawable/ic_notificacao')));
     _pronto = true;
     return true;
@@ -81,44 +76,8 @@ class Notificacoes {
         ),
       );
 
-  static final _canalDescanso = _detalhes('descanso', 'Descanso', 'Avisa quando o tempo de descanso termina');
   static final _canalFinanceiro = _detalhes('financeiro', 'Mensalidades', 'Vencimentos, Pix e pagamentos confirmados');
   static final _canalNovidades = _detalhes('novidades', 'Novidades', 'Avisos do mural, alterações no treino e promoções');
-
-  static Future<AndroidScheduleMode> _modo() async {
-    final exato = await _android?.canScheduleExactNotifications() ?? false;
-    return exato ? AndroidScheduleMode.exactAllowWhileIdle : AndroidScheduleMode.inexactAllowWhileIdle;
-  }
-
-  static Future<void> iniciarDescanso(int segundos) async {
-    if (!await iniciar()) return;
-    await _plugin.cancel(id: _idDescanso);
-    await _plugin.zonedSchedule(
-      id: _idDescanso,
-      scheduledDate: tz.TZDateTime.now(tz.local).add(Duration(seconds: segundos)),
-      notificationDetails: _canalDescanso,
-      androidScheduleMode: await _modo(),
-      title: 'Descanso terminou',
-      body: 'Hora da próxima série!',
-    );
-  }
-
-  static Future<void> descansoTerminou({required bool emPrimeiroPlano}) async {
-    if (!await iniciar()) return;
-    if (emPrimeiroPlano) {
-      await _plugin.cancel(id: _idDescanso);
-      return;
-    }
-    final pendentes = await _plugin.pendingNotificationRequests();
-    if (!pendentes.any((p) => p.id == _idDescanso)) return;
-    await _plugin.cancel(id: _idDescanso);
-    await _plugin.show(id: _idDescanso, title: 'Descanso terminou', body: 'Hora da próxima série!', notificationDetails: _canalDescanso);
-  }
-
-  static Future<void> pararDescanso() async {
-    if (!await iniciar()) return;
-    await _plugin.cancel(id: _idDescanso);
-  }
 
   static Future<void> marcarAvisadas(List<Notificacao> lista) async {
     final prefs = await SharedPreferences.getInstance();

@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../api.dart';
-import '../descanso.dart';
 import '../models.dart';
 import '../notificacoes.dart';
 import '../theme.dart';
@@ -24,10 +26,75 @@ class PerfilScreen extends StatefulWidget {
 }
 
 class _PerfilScreenState extends State<PerfilScreen> {
+  Uint8List? _foto;
+  bool _enviandoFoto = false;
+
   @override
   void initState() {
     super.initState();
     _carregarHistorico();
+    if (widget.aluno.temFoto) _carregarFoto();
+  }
+
+  Future<void> _carregarFoto() async {
+    try {
+      final r = await Api.instancia.get('/foto');
+      if (r is Map && r['base64'] != null && mounted) setState(() => _foto = base64Decode(r['base64'].toString()));
+    } on ApiException {
+      return;
+    }
+  }
+
+  Future<void> _escolherFoto() async {
+    final acao = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(leading: const Icon(Icons.photo_library_outlined), title: const Text('Escolher da galeria'), onTap: () => Navigator.pop(ctx, 'galeria')),
+            if (!kIsWeb)
+              ListTile(leading: const Icon(Icons.photo_camera_outlined), title: const Text('Tirar foto'), onTap: () => Navigator.pop(ctx, 'camera')),
+            if (_foto != null)
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: Cores.vermelhoClaro),
+                title: const Text('Remover foto', style: TextStyle(color: Cores.vermelhoClaro)),
+                onTap: () => Navigator.pop(ctx, 'remover'),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (acao == null) return;
+    setState(() => _enviandoFoto = true);
+    try {
+      if (acao == 'remover') {
+        await Api.instancia.delete('/foto');
+        if (mounted) setState(() => _foto = null);
+        return;
+      }
+      final arquivo = await ImagePicker().pickImage(
+        source: acao == 'camera' ? ImageSource.camera : ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 80,
+      );
+      if (arquivo == null) return;
+      final bytes = await arquivo.readAsBytes();
+      final nome = arquivo.name.toLowerCase();
+      final tipo = nome.endsWith('.png') ? 'image/png' : nome.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+      await Api.instancia.put('/foto', {'tipo': arquivo.mimeType ?? tipo, 'base64': base64Encode(bytes)});
+      if (mounted) {
+        setState(() => _foto = bytes);
+        mostrarMensagem(context, 'Foto atualizada.');
+      }
+    } on ApiException catch (e) {
+      if (mounted) mostrarMensagem(context, e.mensagem, erro: true);
+    } finally {
+      if (mounted) setState(() => _enviandoFoto = false);
+    }
   }
 
   Future<void> _carregarHistorico() async {
@@ -45,7 +112,6 @@ class _PerfilScreenState extends State<PerfilScreen> {
     try {
       await Api.instancia.post('/logout');
     } catch (_) {}
-    Descanso.instancia.parar();
     await Notificacoes.aoSair();
     await Api.instancia.limparToken();
     if (!mounted) return;
@@ -116,17 +182,43 @@ class _PerfilScreenState extends State<PerfilScreen> {
             Cartao(
               child: Row(
                 children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(colors: [Cores.marca, Cores.verde], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                    ),
-                    child: Text(
-                      a.nome.split(' ').where((p) => p.isNotEmpty).map((p) => p[0]).take(2).join().toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 19, color: Colors.white),
+                  GestureDetector(
+                    onTap: _enviandoFoto ? null : _escolherFoto,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(colors: [Cores.marca, Cores.verde], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                            image: _foto == null ? null : DecorationImage(image: MemoryImage(_foto!), fit: BoxFit.cover),
+                          ),
+                          child: _enviandoFoto
+                              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                              : _foto != null
+                                  ? null
+                                  : Text(
+                                      a.nome.split(' ').where((p) => p.isNotEmpty).map((p) => p[0]).take(2).join().toUpperCase(),
+                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 21, color: Colors.white),
+                                    ),
+                        ),
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: Cores.superficieSolida,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Cores.bordaForte),
+                            ),
+                            child: const Icon(Icons.photo_camera_rounded, size: 14, color: Cores.lilas),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 14),

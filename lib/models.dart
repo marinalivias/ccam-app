@@ -6,6 +6,7 @@ class Aluno {
   final DateTime? dataNascimento;
   final double? peso;
   final double? altura;
+  final bool temFoto;
 
   Aluno({
     required this.id,
@@ -15,6 +16,7 @@ class Aluno {
     this.dataNascimento,
     this.peso,
     this.altura,
+    this.temFoto = false,
   });
 
   String get primeiroNome => nome.trim().split(RegExp(r'\s+')).first;
@@ -27,6 +29,7 @@ class Aluno {
         dataNascimento: j['dataNascimento'] != null ? DateTime.tryParse(j['dataNascimento']) : null,
         peso: (j['peso'] as num?)?.toDouble(),
         altura: (j['altura'] as num?)?.toDouble(),
+        temFoto: j['fotoAtualizadaEm'] != null,
       );
 }
 

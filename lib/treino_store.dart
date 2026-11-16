@@ -7,6 +7,7 @@ import 'utils/helpers.dart';
 class TreinoStore extends ChangeNotifier {
   final _api = Api.instancia;
 
+  Aluno? aluno;
   List<Exercicio> ficha = [];
   List<ItemCatalogo> catalogo = [];
   Map<String, ItemCatalogo> _porNome = {};
@@ -24,6 +25,17 @@ class TreinoStore extends ChangeNotifier {
 
   List<TreinoRealizado> realizadosEntre(DateTime de, DateTime ate) =>
       _realizados.values.where((t) => !t.data.isBefore(de) && !t.data.isAfter(ate)).toList()..sort((a, b) => a.data.compareTo(b.data));
+
+  (DateTime, String)? ultimaCarga(String exercicioId, DateTime antesDe) {
+    (DateTime, String)? melhor;
+    for (final t in _realizados.values) {
+      if (!t.data.isBefore(Helpers.soData(antesDe))) continue;
+      final carga = t.registros[exercicioId]?.carga?.trim();
+      if (carga == null || carga.isEmpty) continue;
+      if (melhor == null || t.data.isAfter(melhor.$1)) melhor = (t.data, carga);
+    }
+    return melhor;
+  }
 
   Exercicio? exercicioPorId(String id) {
     for (final e in ficha) {
@@ -65,16 +77,67 @@ class TreinoStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool guardadoOffline = false;
+
   Future<void> registrar(DateTime data, String exercicioId, List<int> reps, String? carga) async {
     final chave = Helpers.isoData(data);
-    final resp = await _api.put('/treinos-realizados/$chave/exercicios/$exercicioId', {'reps': reps, 'carga': carga});
-    if (resp is Map<String, dynamic>) {
-      _realizados[chave] = TreinoRealizado.fromJson(resp);
-    } else {
-      _realizados.remove(chave);
+    guardadoOffline = false;
+    try {
+      final resp = await _api.putOuGuardar('/treinos-realizados/$chave/exercicios/$exercicioId', {'reps': reps, 'carga': carga});
+      if (resp is Map<String, dynamic>) {
+        _realizados[chave] = TreinoRealizado.fromJson(resp);
+      } else {
+        _realizados.remove(chave);
+      }
+      await carregarFrequencia(avisar: false);
+    } on ApiException catch (e) {
+      if (!e.semRede) rethrow;
+      guardadoOffline = true;
+      _registrarLocal(data, exercicioId, reps, carga);
     }
-    await carregarFrequencia(avisar: false);
     notifyListeners();
+  }
+
+  void _registrarLocal(DateTime data, String exercicioId, List<int> reps, String? carga) {
+    final chave = Helpers.isoData(data);
+    final anterior = _realizados[chave];
+    final ex = exercicioPorId(exercicioId);
+    final meta = ex?.alvoReps ?? 1;
+    final registros = {...?anterior?.registros};
+    final ids = {...?anterior?.idsFeitos};
+    if (reps.every((v) => v == 0)) {
+      registros.remove(exercicioId);
+      ids.remove(exercicioId);
+    } else {
+      final completo = reps.length >= (ex?.totalSeries ?? reps.length) && reps.every((v) => v >= meta);
+      registros[exercicioId] = Registro(exercicioId: exercicioId, reps: reps, carga: carga, completo: completo);
+      if (completo) {
+        ids.add(exercicioId);
+      } else {
+        ids.remove(exercicioId);
+      }
+    }
+    if (registros.isEmpty && ids.isEmpty) {
+      _realizados.remove(chave);
+      return;
+    }
+    final previstos = doDia(data);
+    var seriesFeitas = 0;
+    for (final e in previstos) {
+      final r = registros[e.id];
+      seriesFeitas += r == null ? (ids.contains(e.id) ? e.totalSeries : 0) : r.reps.where((v) => v >= (e.alvoReps ?? 1)).length;
+    }
+    _realizados[chave] = TreinoRealizado(
+      data: data,
+      previstos: previstos.length,
+      feitos: ids.length,
+      seriesPrevistas: previstos.fold(0, (t, e) => t + e.totalSeries),
+      seriesFeitas: seriesFeitas,
+      concluido: previstos.isNotEmpty && ids.length >= previstos.length,
+      idsFeitos: ids,
+      observacao: anterior?.observacao,
+      registros: registros,
+    );
   }
 
   Future<void> limparFicha() async {
@@ -151,7 +214,7 @@ class TreinoStore extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final resp = await _api.put('/treinos-realizados/$chave', {
+      final resp = await _api.putOuGuardar('/treinos-realizados/$chave', {
         'idsFeitos': ids.toList(),
         'observacao': observacao,
       });
@@ -161,6 +224,14 @@ class TreinoStore extends ChangeNotifier {
         _realizados.remove(chave);
       }
       await carregarFrequencia(avisar: false);
+    } on ApiException catch (e) {
+      if (e.semRede) return;
+      if (anterior != null) {
+        _realizados[chave] = anterior;
+      } else {
+        _realizados.remove(chave);
+      }
+      rethrow;
     } catch (e) {
       if (anterior != null) {
         _realizados[chave] = anterior;

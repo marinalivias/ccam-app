@@ -33,47 +33,63 @@ class BotaoNotificacoes extends StatelessWidget {
 }
 
 Future<void> abrirNotificacoes(BuildContext context, SocialStore social, void Function(String tipo) abrir) async {
-  final novas = {for (final n in social.notificacoes) if (social.novidade(n)) n.id};
-  social.marcarLidas();
   final escolhida = await showModalBottomSheet<Notificacao>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (ctx) => ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 12, 8),
-              child: Row(
-                children: [
-                  const Expanded(child: Text('Notificações', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
-                  IconButton(tooltip: 'Fechar', onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-                ],
-              ),
-            ),
-            if (social.notificacoes.isEmpty)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 10, 20, 30),
-                child: Vazio(icone: Icons.notifications_none_rounded, titulo: 'Nada por aqui', texto: 'Pagamentos, avisos e mudanças no treino aparecem aqui.'),
-              )
-            else
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  itemCount: social.notificacoes.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) {
-                    final n = social.notificacoes[i];
-                    return _Item(n: n, nova: novas.contains(n.id), onTap: () => Navigator.pop(ctx, n));
-                  },
+    builder: (ctx) => ListenableBuilder(
+      listenable: social,
+      builder: (ctx, _) => ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 12, 8),
+                child: Row(
+                  children: [
+                    const Expanded(child: Text('Notificações', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
+                    if (social.naoLidas > 0)
+                      IconButton(
+                        tooltip: 'Marcar todas como lidas',
+                        onPressed: social.marcarTodasLidas,
+                        icon: const Icon(Icons.done_all_rounded, color: Cores.lilas),
+                      ),
+                    IconButton(tooltip: 'Fechar', onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                  ],
                 ),
               ),
-          ],
+              if (social.notificacoes.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 10, 20, 30),
+                  child: Vazio(icone: Icons.notifications_none_rounded, titulo: 'Nada por aqui', texto: 'Pagamentos, avisos e mudanças no treino aparecem aqui.'),
+                )
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: social.notificacoes.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (_, i) {
+                      final n = social.notificacoes[i];
+                      final lida = social.lida(n);
+                      return _Item(
+                        n: n,
+                        nova: !lida,
+                        onTap: () {
+                          social.marcarLida(n);
+                          Navigator.pop(ctx, n);
+                        },
+                        onAlternar: () => social.marcarLida(n, lida: !lida),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     ),
@@ -85,8 +101,9 @@ class _Item extends StatelessWidget {
   final Notificacao n;
   final bool nova;
   final VoidCallback onTap;
+  final VoidCallback onAlternar;
 
-  const _Item({required this.n, required this.nova, required this.onTap});
+  const _Item({required this.n, required this.nova, required this.onTap, required this.onAlternar});
 
   (IconData, Color) get _visual => switch (n.tipo) {
         'pagamento' => (
@@ -148,6 +165,24 @@ class _Item extends StatelessWidget {
                     Text(n.texto, style: const TextStyle(color: Cores.textoSuave, fontSize: 13, height: 1.35)),
                   ],
                 ),
+              ),
+              PopupMenuButton<int>(
+                tooltip: 'Opções',
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.more_vert_rounded, size: 20, color: Cores.textoFraco),
+                onSelected: (_) => onAlternar(),
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 0,
+                    child: Row(
+                      children: [
+                        Icon(nova ? Icons.mark_email_read_outlined : Icons.mark_email_unread_outlined, size: 20),
+                        const SizedBox(width: 10),
+                        Text(nova ? 'Marcar como lida' : 'Marcar como não lida'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

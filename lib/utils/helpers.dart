@@ -37,12 +37,6 @@ class Helpers {
     return dias[diaDaSemana - 1];
   }
 
-  static String formatarTempoDescanso(int segundos) {
-    final mins = segundos ~/ 60;
-    final secs = segundos % 60;
-    return '$mins:${secs.toString().padLeft(2, '0')}';
-  }
-
   static DateTime soData(DateTime d) => DateTime(d.year, d.month, d.day);
 
   static DateTime segundaDaSemana(DateTime d) => soData(d).subtract(Duration(days: d.weekday - 1));

@@ -89,10 +89,10 @@ class _CalendarioScreenState extends State<CalendarioScreen> {
                     const Expanded(
                       child: Text('Calendário', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
                     ),
-                    FilledButton.tonalIcon(
+                    BotaoPilula(
+                      texto: 'Minha ficha',
+                      icone: Icons.edit_note_rounded,
                       onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MinhaFichaScreen(store: store))),
-                      icon: const Icon(Icons.edit_note_rounded, size: 20),
-                      label: const Text('Minha ficha'),
                     ),
                   ],
                 ),

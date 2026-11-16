@@ -63,10 +63,11 @@ class MinhaFichaScreen extends StatelessWidget {
                         child: Text('Minha ficha', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.4)),
                       ),
                       if (total > 0)
-                        TextButton(
-                          style: TextButton.styleFrom(foregroundColor: Cores.vermelhoClaro),
+                        BotaoPilula(
+                          texto: 'Começar do zero',
+                          icone: Icons.restart_alt_rounded,
+                          perigo: true,
                           onPressed: () => _comecarDoZero(context),
-                          child: const Text('Começar do zero'),
                         ),
                     ],
                   ),

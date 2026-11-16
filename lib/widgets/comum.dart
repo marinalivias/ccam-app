@@ -367,3 +367,38 @@ class BotaoFiltro extends StatelessWidget {
     );
   }
 }
+
+class BotaoPilula extends StatelessWidget {
+  final String texto;
+  final IconData icone;
+  final VoidCallback? onPressed;
+  final bool perigo;
+
+  const BotaoPilula({super.key, required this.texto, required this.icone, required this.onPressed, this.perigo = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final cor = perigo ? Cores.vermelho : Cores.marca;
+    final corTexto = perigo ? Cores.vermelhoClaro : const Color(0xFFDDD6FE);
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: cor.withValues(alpha: perigo ? 0.12 : 0.18),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: perigo ? const Color(0x61EF4444) : const Color(0x66A78BFA)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icone, size: 17, color: corTexto),
+            const SizedBox(width: 6),
+            Text(texto, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: corTexto)),
+          ],
+        ),
+      ),
+    );
+  }
+}

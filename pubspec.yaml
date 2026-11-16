@@ -16,8 +16,11 @@ dependencies:
   google_fonts: ^6.3.0
   qr_flutter: ^4.1.0
   flutter_local_notifications: ^22.0.0
-  timezone: ^0.11.2
   workmanager: ^0.10.10
+  image_picker: ^1.2.4
+  pdf: ^3.13.1
+  printing: ^5.15.1
+  url_launcher: ^6.3.3
 
 dev_dependencies:
   flutter_test:

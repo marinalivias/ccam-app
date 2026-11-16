@@ -37,6 +37,75 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _esqueciSenha() async {
+    final email = TextEditingController(text: _email.text.trim());
+    final chave = GlobalKey<FormState>();
+    var enviando = false;
+    String? resposta;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+          child: Form(
+            key: chave,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Esqueci minha senha', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                const Text(
+                  'Avisamos a recepção da sua academia. Quando ela redefinir, você entra com o e-mail e o seu CPF e pode criar uma senha nova no perfil.',
+                  style: TextStyle(color: Cores.textoSuave, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                if (resposta != null)
+                  Cartao(
+                    corBorda: const Color(0x6122C55E),
+                    child: Row(
+                      children: [
+                        const IconeChip(Icons.mark_email_read_rounded, cor: Cores.verde),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(resposta!, style: const TextStyle(height: 1.4))),
+                      ],
+                    ),
+                  )
+                else ...[
+                  TextFormField(
+                    controller: email,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(labelText: 'E-mail cadastrado', prefixIcon: Icon(Icons.mail_outline_rounded, size: 20)),
+                    validator: Validators.validaEmail,
+                  ),
+                  const SizedBox(height: 16),
+                  BotaoMarca(
+                    texto: 'Avisar a recepção',
+                    icone: Icons.send_rounded,
+                    carregando: enviando,
+                    onPressed: () async {
+                      if (!chave.currentState!.validate()) return;
+                      setSheet(() => enviando = true);
+                      try {
+                        final r = await Api.instancia.post('/esqueci-senha', {'email': email.text.trim().toLowerCase()});
+                        setSheet(() => resposta = (r is Map ? r['mensagem'] : null)?.toString() ?? 'Pedido enviado.');
+                      } on ApiException catch (e) {
+                        setSheet(() => enviando = false);
+                        if (ctx.mounted) mostrarMensagem(ctx, e.mensagem, erro: true);
+                      }
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _entrar() async {
     if (!_form.currentState!.validate()) return;
     setState(() {
@@ -159,7 +228,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                             ],
-                            const SizedBox(height: 20),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(onPressed: _esqueciSenha, child: const Text('Esqueci minha senha')),
+                            ),
+                            const SizedBox(height: 6),
                             BotaoMarca(texto: 'Entrar', icone: Icons.arrow_forward_rounded, carregando: _carregando, onPressed: _entrar),
                           ],
                         ),
@@ -167,7 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 18),
                     const Text(
-                      'Não consegue entrar? Fale com a recepção da sua academia.',
+                      'Ainda não tem acesso? Fale com a recepção da sua academia.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Cores.textoFraco, fontSize: 13),
                     ),

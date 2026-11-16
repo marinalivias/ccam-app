@@ -7,16 +7,17 @@ import 'notificacoes.dart';
 
 class SocialStore extends ChangeNotifier {
   static const _chaveVisto = 'notificacoes_vistas_em';
+  static const _chaveLidas = 'notificacoes_lidas';
 
   final _api = Api.instancia;
 
   Loja? loja;
   List<Notificacao> notificacoes = [];
-  DateTime? _vistasEm;
+  Set<String> _lidas = {};
 
-  int get naoLidas => notificacoes.where((n) => _vistasEm == null || n.data.isAfter(_vistasEm!)).length;
+  int get naoLidas => notificacoes.where((n) => !_lidas.contains(n.id)).length;
 
-  bool novidade(Notificacao n) => _vistasEm == null || n.data.isAfter(_vistasEm!);
+  bool lida(Notificacao n) => _lidas.contains(n.id);
 
   Future<void> carregar() => Future.wait([carregarLoja(), carregarNotificacoes()]);
 
@@ -34,7 +35,13 @@ class SocialStore extends ChangeNotifier {
       final lista = await _api.get('/notificacoes') as List;
       notificacoes = lista.map((e) => Notificacao.fromJson(e)).toList();
       final prefs = await SharedPreferences.getInstance();
-      _vistasEm = DateTime.tryParse(prefs.getString(_chaveVisto) ?? '');
+      final salvas = prefs.getStringList(_chaveLidas);
+      if (salvas != null) {
+        _lidas = salvas.toSet();
+      } else {
+        final vistasEm = DateTime.tryParse(prefs.getString(_chaveVisto) ?? '');
+        _lidas = {for (final n in notificacoes) if (vistasEm != null && !n.data.isAfter(vistasEm)) n.id};
+      }
       await Notificacoes.marcarAvisadas(notificacoes);
       notifyListeners();
     } on ApiException {
@@ -42,10 +49,26 @@ class SocialStore extends ChangeNotifier {
     }
   }
 
-  Future<void> marcarLidas() async {
-    _vistasEm = DateTime.now();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_chaveVisto, _vistasEm!.toIso8601String());
+  Future<void> marcarLida(Notificacao n, {bool lida = true}) async {
+    if (lida) {
+      _lidas.add(n.id);
+    } else {
+      _lidas.remove(n.id);
+    }
+    await _salvarLidas();
+  }
+
+  Future<void> marcarTodasLidas() async {
+    _lidas.addAll(notificacoes.map((n) => n.id));
+    await _salvarLidas();
+  }
+
+  Future<void> _salvarLidas() async {
     notifyListeners();
+    final atuais = notificacoes.map((n) => n.id).toSet();
+    _lidas = _lidas.where(atuais.contains).toSet();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_chaveLidas, _lidas.toList());
+    await prefs.remove(_chaveVisto);
   }
 }
