@@ -1,7 +1,16 @@
+import java.util.Properties
+
  plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val chave = Properties()
+val arquivoChave = rootProject.file("key.properties")
+val chaveExiste = arquivoChave.exists()
+if (chaveExiste) {
+    arquivoChave.inputStream().use { chave.load(it) }
 }
 
 android {
@@ -28,9 +37,20 @@ android {
         multiDexEnabled = true
     }
 
+    signingConfigs {
+        create("release") {
+            if (chaveExiste) {
+                keyAlias = chave["keyAlias"] as String
+                keyPassword = chave["keyPassword"] as String
+                storeFile = file(chave["storeFile"] as String)
+                storePassword = chave["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (chaveExiste) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
 }

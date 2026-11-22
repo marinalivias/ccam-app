@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname "$0")"
 
-SITE="${1:-../ccam_2.0000-master}"
+SITE="${1:-../ccam}"
 DESTINO="$SITE/src/main/resources/static/app"
 
 if [ ! -d "$SITE/src/main/resources/static" ]; then
